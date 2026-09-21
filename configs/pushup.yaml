@@ -1,0 +1,4 @@
+# Push-up rules. Every threshold needs a comment saying why it has that value.
+# Filled in during Phase 4, then tuned against the evaluation table in Phase 5.
+exercise: pushup
+rules: {}

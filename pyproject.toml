@@ -1,0 +1,41 @@
+[project]
+name = "form-coach"
+version = "0.1.0"
+description = "Analyzes phone video of push-ups and gives per-rep form feedback."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mediapipe",        # pose landmarks (Tasks API)
+    "opencv-python",    # video read/write, drawing
+    "numpy",            # landmark arrays, angle math
+    "scipy",            # smoothing, peak finding
+    "pyyaml",           # rule config
+    "pandas",           # evaluation joins
+    "matplotlib",       # dev plots while tuning
+    "fastapi",          # web API
+    "uvicorn",          # ASGI server for FastAPI
+    "python-multipart", # file uploads
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Ruff formats Python snippets embedded in Markdown; the guide is prose, leave it alone.
+exclude = ["docs"]
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "F", # pyflakes: undefined names, unused imports
+    "I", # isort: import order
+    "B", # bugbear: likely bugs
+    "UP", # pyupgrade: modern syntax for the target version
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

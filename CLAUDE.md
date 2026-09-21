@@ -12,8 +12,8 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 0 (setup)
-- Next: <update this line as I go>
+- Phase: 1 (film and label the dataset)
+- Next: film 15-20 side-view clips into `data/videos/`, then fill `data/labels.csv` one row per rep.
 
 ## Conventions
 

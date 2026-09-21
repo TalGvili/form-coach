@@ -4,3 +4,5 @@ data/cache/
 *.task
 *.db
 __pycache__/
+.vscode/
+.idea/

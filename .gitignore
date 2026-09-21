@@ -1,0 +1,6 @@
+.venv/
+data/videos/
+data/cache/
+*.task
+*.db
+__pycache__/

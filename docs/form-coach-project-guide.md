@@ -1,6 +1,6 @@
 # Form Coach — Step-by-Step Project Guide
 
-Last updated: 2026-09-21
+2026-09-21 · @Someone
 
 ## Overview
 
@@ -89,18 +89,29 @@ Create the repo, environment and empty skeleton so every later phase has a place
 The dataset comes before any analysis code, because every later decision is tuned and judged against it.
 
 1. Film 15–20 clips of about 8 reps each, all from the **same side view**, phone at floor-to-hip height, whole body in frame.
-2. Include deliberate faults: clean reps, sagging hips, shallow reps, a mix within one set, one badly lit clip, one slightly off-angle clip.
+2. Include deliberate faults: clean reps, shallow reps, sagging hips, piked hips, reps that stop short of lockout at the top, a mix within one set, one badly lit clip, one slightly off-angle clip. Aim for at least 10–15 examples of each fault across all clips.
 3. Name them consistently: `clip01.mp4`, `clip02.mp4`, …
 4. Watch each clip and fill in `data/labels.csv`, one row per rep:
 
 ```csv
-clip,rep,hip_sag,shallow
-clip01,1,0,0
-clip01,2,0,1
-clip01,3,1,1
+clip,rep,shallow,hip_sag,hip_pike,no_lockout
+clip01,1,0,0,0,0
+clip01,2,1,0,0,0
+clip01,3,1,1,0,1
 ```
 
-Be strict and consistent with your own labeling rule (for example: "shallow = chest clearly above elbow height at the bottom"). Write that rule down in the README; it's part of your evaluation's definition.
+Label each fault with a written rule, applied the same way every time. A starting point:
+
+| Column | Label 1 when… |
+| --- | --- |
+| shallow | At the bottom, the chest stays clearly above elbow height |
+| hip\_sag | The hips visibly drop below the shoulder–ankle line for a noticeable part of the rep |
+| hip\_pike | The hips visibly rise above the shoulder–ankle line (the body forms an inverted V) |
+| no\_lockout | At the top, the arms don't straighten before the next rep starts |
+
+Adjust the wording to your own eye, then write the final rules in the README; they're part of your evaluation's definition. Label what actually happened on video, not what you meant to do.
+
+**Deliberately not labeled:** a lower-back arch while the hips stay in line. The pose model has no landmarks along the spine, so it can't be measured from shoulder and hip points; list it under limitations in the README. Head position and tempo are measurable but left as stretch goals.
 
 **Done when:** every clip has a label row for every rep.
 
@@ -129,8 +140,10 @@ class Rep:
     start_frame: int
     bottom_frame: int
     end_frame: int
-    min_elbow_angle: float
-    min_hip_angle: float
+    min_elbow_angle: float     # depth (shallow)
+    max_elbow_angle: float     # lockout at the top (no_lockout)
+    max_hip_drop_deg: float    # hip below the body line (hip_sag)
+    max_hip_rise_deg: float    # hip above the body line (hip_pike)
     hip_sag_duration_s: float
 
 @dataclass(frozen=True)
@@ -176,7 +189,7 @@ Turn noisy per-frame landmarks into clean angle signals, split them into `Rep` o
 ### Step 1: Angles and smoothing (`pipeline/signals.py`)
 
 1. Write `angle(a, b, c) -> float`: the angle at point b, via the dot product, with `np.clip` before `arccos`.
-2. Write `angle_series(landmarks, joints) -> np.ndarray`: one angle per frame for a joint triple.
+2. Write `angle_series(landmarks, joints) -> np.ndarray`: one angle per frame for a joint triple. For the body line, also write `hip_deviation_series(landmarks) -> np.ndarray`: how many degrees the hip sits off the straight shoulder–ankle line, signed (positive = below, sagging; negative = above, piking). The plain angle at the hip can't tell sag from pike, since both make it smaller than 180°. Take the magnitude as 180° minus the hip angle, and the sign from whether the hip's y is greater than the line's y at the hip's x (image y points down). That works whichever way the person faces; check the sign on one clip of each fault.
 3. Fill short gaps of missing frames by linear interpolation (a few frames at most). Leave long gaps as `NaN`.
 4. Smooth with `scipy.signal.savgol_filter`. It removes jitter while keeping the shape of the dips better than a moving average. The window length is a parameter you'll tune in Phase 5.
 
@@ -185,7 +198,7 @@ Turn noisy per-frame landmarks into clean angle signals, split them into `Rep` o
 1. Invert the smoothed elbow signal and run `scipy.signal.find_peaks`; each peak is the bottom of a rep.
 2. Use `prominence` to ignore small wobbles and `distance` to enforce a minimum time between reps.
 3. Define each rep's start and end as the high points between consecutive bottoms.
-4. Compute each rep's metrics and return `list[Rep]`.
+4. Compute each rep's metrics: minimum elbow angle (depth), maximum elbow angle at the top (lockout), largest positive and largest negative hip deviation (sag and pike, both stored as positive numbers), and how long the sag lasted. Return `list[Rep]`.
 
 ### Step 3: Tests (`tests/`)
 
@@ -231,22 +244,32 @@ Build a generic engine that applies rules read from YAML to each `Rep`, producin
 ```yaml
 exercise: pushup
 rules:
-  depth:
+  shallow:
     metric: min_elbow_angle
     max: 100          # elbow must bend below 100 deg at the bottom
     message: "Not reaching full depth"
   hip_sag:
-    metric: min_hip_angle
-    min: 165          # body line; below this the hips are dropping
+    metric: max_hip_drop_deg
+    max: 15           # hip more than 15 deg below the body line
     min_duration_s: 0.3
     message: "Hips dropping — engage your core"
+  hip_pike:
+    metric: max_hip_rise_deg
+    max: 15           # hip more than 15 deg above the body line
+    message: "Hips too high — lower them into a straight line"
+  no_lockout:
+    metric: max_elbow_angle
+    min: 160          # arms should be nearly straight at the top
+    message: "Straighten your arms fully at the top"
 ```
+
+Rule names match the column names in `labels.csv`, so Phase 5 can compare predictions to labels without a mapping table.
 
 Comment every threshold with why it's that value. The starting values are guesses; Phase 5 replaces them with measured choices.
 
 ### Step 2: The engine (`pipeline/rules.py`)
 
-1. Load the YAML into a small `Rule` dataclass (name, metric, min, max, min_duration_s, message).
+1. Load the YAML into a small `Rule` dataclass (name, metric, min, max, min\_duration\_s, message).
 2. Write `evaluate(reps, rules) -> list[Fault]`: for each rep and rule, read the metric off the `Rep` and compare against the bounds.
 3. Keep the engine exercise-agnostic: it should never mention push-ups, only metrics and bounds. That's what lets a free throw be a new YAML file later.
 
@@ -270,7 +293,9 @@ Measure how well the detector matches your labels, then tune thresholds against 
 | Fault | Detected | Missed | False alarms | Precision | Recall |
 | --- | --- | --- | --- | --- | --- |
 | shallow | 31 | 2 | 1 | 0.97 | 0.94 |
-| hip_sag | 14 | 9 | 6 | 0.70 | 0.61 |
+| hip\_sag | 14 | 9 | 6 | 0.70 | 0.61 |
+| hip\_pike | 12 | 3 | 2 | 0.86 | 0.80 |
+| no\_lockout | 18 | 4 | 5 | 0.78 | 0.82 |
 
 (Example numbers, to show the shape.)
 
@@ -311,7 +336,7 @@ Decide what each bad input returns, instead of a stack trace:
 | Input | Response |
 | --- | --- |
 | Not a video file | 400, "Please upload a video file" |
-| Video longer than ~2 minutes | 413, "Videos must be under 2 minutes" |
+| Video longer than \~2 minutes | 413, "Videos must be under 2 minutes" |
 | No person detected in most frames | 422, "Couldn't find a person — check framing" |
 | Person found but zero reps | 200 with an empty rep list and a hint about camera angle |
 
@@ -345,7 +370,9 @@ CREATE TABLE reps (
     start_s            REAL,
     end_s              REAL,
     min_elbow_angle    REAL,
-    min_hip_angle      REAL,
+    max_elbow_angle    REAL,
+    max_hip_drop_deg   REAL,
+    max_hip_rise_deg   REAL,
     hip_sag_duration_s REAL
 );
 ```

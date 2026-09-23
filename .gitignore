@@ -6,3 +6,6 @@ data/cache/
 __pycache__/
 .vscode/
 .idea/
+
+# Private scratchpad: half-formed ideas, not written for a reader.
+docs/notes.txt

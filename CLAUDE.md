@@ -12,8 +12,12 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 1 (film and label the dataset)
-- Next: film 15-20 side-view clips into `data/videos/`, then fill `data/labels.csv` one row per rep.
+- Phase: 2 (data types, landmarks and visualization)
+- Next: write the dataclasses in `pipeline/models.py`, then MediaPipe extraction and the
+  `.npy` cache in `pipeline/landmarks.py`.
+
+Phase 1 is done: 20 clips, 159 labeled reps in `data/labels.csv`, generated from
+`data/labeling_sheet.md`. Held-out clips (never used for tuning): 10, 12, 15, 17, 18, 20.
 
 ## Conventions
 

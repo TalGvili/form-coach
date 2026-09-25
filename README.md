@@ -7,7 +7,29 @@ to track progress over time.
 Built with MediaPipe pose estimation, SciPy signal processing and a config-driven rule engine
 behind a FastAPI service.
 
-**Status:** in progress (Phase 1 — filming and labelling the dataset). Not yet usable.
+**Status:** in progress (Phase 2 — landmark extraction). Not yet usable.
+
+## Setup
+
+Python 3.12 — MediaPipe does not publish wheels for newer versions.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+The pose model is a 9 MB binary and is not tracked in git, so download it separately:
+
+```bash
+mkdir -p models
+curl -o models/pose_landmarker_full.task \
+  https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+```
+
+The push-up clips are private and not in the repo either, so the pipeline can't be re-run on
+the original dataset. `data/labels.csv` and `data/labeling_sheet.md` are included, so the
+labels and the evaluation method can still be inspected.
 
 ## Dataset and labeling
 

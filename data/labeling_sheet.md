@@ -28,7 +28,6 @@ Apply the same written rule every time, and label what actually happened on vide
 | clip01 | 7 | 0 | 0 | 0 | 0 |  |
 | clip01 | 8 | 0 | 0 | 0 | 0 |  |
 | clip01 | 9 | 0 | 0 | 0 | 0 |  |
-| clip01 | 10 | 0 | 0 | 0 | 0 |  |
 | clip02 | 1 | 1 | 0 | 0 | 0 |  |
 | clip02 | 2 | 1 | 0 | 0 | 0 |  |
 | clip02 | 3 | 1 | 0 | 0 | 0 |  |

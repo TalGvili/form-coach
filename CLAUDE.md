@@ -16,7 +16,7 @@ Full plan: @docs/form-coach-project-guide.md
 - Next: write the dataclasses in `pipeline/models.py`, then MediaPipe extraction and the
   `.npy` cache in `pipeline/landmarks.py`.
 
-Phase 1 is done: 20 clips, 159 labeled reps in `data/labels.csv`, generated from
+Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 `data/labeling_sheet.md`. Held-out clips (never used for tuning): 10, 12, 15, 17, 18, 20.
 
 ## Conventions

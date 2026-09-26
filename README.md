@@ -37,7 +37,7 @@ labels and the evaluation method can still be inspected.
 hand-written record; `data/labels.csv` is generated from it by `scripts/labels_from_md.py`
 and regenerated after every relabel, so the two never drift apart.
 
-159 reps in total:
+158 reps in total:
 
 | Label | Reps | Clips |
 | --- | --- | --- |
@@ -45,9 +45,9 @@ and regenerated after every relabel, so the two never drift apart.
 | `hip_sag` | 33 | 6 |
 | `hip_pike` | 26 | 5 |
 | `no_lockout` | 24 | 4 |
-| clean (no fault) | 53 | 10 |
+| clean (no fault) | 52 | 10 |
 
-A rep can carry more than one fault, so the fault counts overlap and do not sum to 159. The
+A rep can carry more than one fault, so the fault counts overlap and do not sum to 158. The
 clip count matters as much as the rep count: reps within one clip share lighting, camera
 position and body proportions, so they are not independent samples.
 
@@ -90,7 +90,7 @@ Six clips are held out and were chosen before any detection code was written:
 **clip10** (sag) · **clip12** (clean, off-angle) · **clip15** (no lockout, mirrored) ·
 **clip17** (pike) · **clip18** (shallow) · **clip20** (clean, mirrored)
 
-49 of 159 reps, 31%. Every fault appears at least once. Thresholds and smoothing parameters are
+49 of 158 reps, 31%. Every fault appears at least once. Thresholds and smoothing parameters are
 tuned on the other 14 clips only; the final evaluation table is reported on these six, so the
 numbers describe performance on video that was never used for tuning.
 

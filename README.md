@@ -44,8 +44,8 @@ and regenerated after every relabel, so the two never drift apart.
 | `shallow` | 50 | 7 |
 | `hip_sag` | 33 | 6 |
 | `hip_pike` | 26 | 5 |
-| `no_lockout` | 24 | 4 |
-| clean (no fault) | 52 | 10 |
+| `no_lockout` | 25 | 5 |
+| clean (no fault) | 51 | 10 |
 
 A rep can carry more than one fault, so the fault counts overlap and do not sum to 158. The
 clip count matters as much as the rep count: reps within one clip share lighting, camera
@@ -75,7 +75,7 @@ that happen to occur together. Reps carrying exactly one fault:
 
 | Fault | Isolated reps |
 | --- | --- |
-| `no_lockout` | 24 / 24 |
+| `no_lockout` | 25 / 25 |
 | `hip_pike` | 19 / 26 |
 | `shallow` | 23 / 50 |
 | `hip_sag` | 13 / 33 |

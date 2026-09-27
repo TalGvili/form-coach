@@ -64,7 +64,7 @@ Apply the same written rule every time, and label what actually happened on vide
 | clip06 | 3 | 0 | 0 | 1 | 0 |  |
 | clip06 | 4 | 0 | 0 | 1 | 0 |  |
 | clip06 | 5 | 0 | 0 | 0 | 0 | On the border with hip pike |
-| clip06 | 6 | 0 | 0 | 0 | 0 |  |
+| clip06 | 6 | 0 | 0 | 0 | 1 | Relabelled 2026-09-27 on review: arms stop short of straight |
 | clip06 | 7 | 0 | 0 | 0 | 0 |  |
 | clip06 | 8 | 0 | 0 | 0 | 0 |  |
 | clip07 | 1 | 0 | 0 | 0 | 1 |  |

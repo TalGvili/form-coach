@@ -12,9 +12,17 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 2 (data types, landmarks and visualization)
-- Next: write the dataclasses in `pipeline/models.py`, then MediaPipe extraction and the
-  `.npy` cache in `pipeline/landmarks.py`.
+- Phase: 3 (signals, verification, rep segmentation)
+- Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
+  `signals.py` with tests. The hip-deviation sign is verified on real clips and by a
+  mirror test.
+- Next: `pipeline/reps.py`. Segment on the upper-arm angle inside the in-position window.
+  Each rep spans top -> bottom -> top; the first and last rep have no neighbour on one
+  side, so bound that side by the clip's typical descent/ascent, or getting down and up
+  leaks in as fake hip pike. Then check rep counts against `labels.csv`.
+- Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
+  hip faults use the signed hip deviation. The measurements behind these are in
+  `docs/notes.txt` (private, gitignored).
 
 Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 `data/labeling_sheet.md`. Held-out clips (never used for tuning): 10, 12, 15, 17, 18, 20.

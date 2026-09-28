@@ -1,4 +1,43 @@
-# Push-up rules. Every threshold needs a comment saying why it has that value.
-# Filled in during Phase 4, then tuned against the evaluation table in Phase 5.
+# Push-up configuration. Every threshold needs a comment saying why it has that value.
+# The values are starting points, tuned against the labelled training clips in Phase 5.
 exercise: pushup
+
+# How reps are found and measured (pipeline/reps.py).
+segmentation:
+  # A shoulder-ankle line steeper than this is standing or kneeling, not a push-up.
+  # Push-ups measured 0-10 deg; standing ~85 deg.
+  max_tilt_deg: 35
+
+  # Detection dropouts up to this many frames (~0.17 s at 30 fps) are bridged by a straight
+  # line. Longer gaps mean the person left the frame and stay unknown.
+  max_gap_frames: 5
+
+  # Savitzky-Golay window. Needed for the hip-duration thresholds, which jitter breaks.
+  # It also lifts the bottom of narrow dips by a few degrees, so tune it together with the
+  # shallow threshold, not separately.
+  smoothing_window_s: 0.4
+
+  # A dip counts as a rep bottom only if it spans this share of the clip's upper-arm range
+  # (5th-95th percentile). Relative, so it works at any camera distance.
+  min_prominence_fraction: 0.3
+
+  # No two rep bottoms closer than this. The fastest reps filmed took ~1.4 s.
+  min_rep_spacing_s: 0.8
+
+  # A rep counts only if the person climbs back up at least this share of a typical rep.
+  # Measured: a failed rep 0.33, the lowest completed rep 0.52. A second failed rep (0.64)
+  # cannot be told apart from a no-lockout rep (0.63) by this signal.
+  min_return_fraction: 0.45
+
+  # Hip metrics use only frames where the upper arm is below this share of the way from the
+  # rep's bottom to its top. At the top the person settles into the plank, pauses or starts
+  # getting up, and the hip moves while the arms stay still. Measured on 11 clips with the
+  # planned 15 deg / 0.3 s rules: pike false alarms 12 -> 5 at 0.9, no labelled fault lost;
+  # 0.8 starts losing real sags.
+  hip_moving_fraction: 0.9
+
+  # Hip sag / pike durations count the time the hip spends beyond this many degrees off the
+  # body line. Keep it equal to the hip rules' thresholds once those exist.
+  hip_duration_threshold_deg: 15
+
 rules: {}

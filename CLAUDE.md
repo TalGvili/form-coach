@@ -12,14 +12,13 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 3 (signals, verification, rep segmentation)
+- Phase: 4 (rule engine and feedback)
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
-  `signals.py` with tests. The hip-deviation sign is verified on real clips and by a
-  mirror test.
-- Next: `pipeline/reps.py`. Segment on the upper-arm angle inside the in-position window.
-  Each rep spans top -> bottom -> top; the first and last rep have no neighbour on one
-  side, so bound that side by the clip's typical descent/ascent, or getting down and up
-  leaks in as fake hip pike. Then check rep counts against `labels.csv`.
+  `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
+  and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
+  failed rep reads like a no-lockout rep; clip13: a pike rep's dip is too small).
+- Next: `pipeline/rules.py` and the `rules:` section of `configs/pushup.yaml`, with the
+  three outcomes: fault, no fault, could not evaluate (NaN).
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).

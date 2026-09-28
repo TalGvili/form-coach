@@ -1,5 +1,7 @@
 # Form Coach
 
+[![CI](https://github.com/TalGvili/form-coach/actions/workflows/ci.yml/badge.svg)](https://github.com/TalGvili/form-coach/actions/workflows/ci.yml)
+
 Web app that analyzes phone video of push-ups and gives per-rep form feedback: rep counting,
 four fault types (shallow depth, sagging hips, piked hips, no lockout), and session history
 to track progress over time.
@@ -7,7 +9,8 @@ to track progress over time.
 Built with MediaPipe pose estimation, SciPy signal processing and a config-driven rule engine
 behind a FastAPI service.
 
-**Status:** in progress (Phase 2 — landmark extraction). Not yet usable.
+**Status:** in progress (Phase 4 — rule engine). Landmarks, signals and rep segmentation are
+done; rep counts match the labels on 12 of the 14 training clips. Not yet usable.
 
 ## Setup
 
@@ -97,13 +100,43 @@ numbers describe performance on video that was never used for tuning.
 One cost is worth stating: clip10 holds 8 of the 13 isolated `hip_sag` reps, leaving 5 for
 tuning. A test set with only one sag rep would have been worse.
 
-### Limitations
+## Limitations
 
+What the method structurally cannot do, and why tuning won't fix it.
+
+- **Every clip shows the same person.** All 20 clips are of one person, with the faults
+  performed on purpose. Body proportions, clothing, and the way a fault looks when it happens
+  unintentionally all change the landmarks, and none of them vary in this dataset. The
+  held-out clips measure performance on unseen video of the same person, not on other people.
+  Only filming more people can fix this; tuning can't.
 - **A lower-back arch while the hips stay in line can't be measured.** The pose model has no
   landmarks along the spine, only shoulders and hips. Sag and pike are detectable because they
   move the hip landmark itself off the shoulder–ankle line; an arch does not.
-- **Failed reps are not analyzed.** They are excluded from the labels, so nothing measures them.
 - **Side view only.** Every measurement assumes the camera is roughly perpendicular to the body,
   at floor-to-hip height, with the whole body in frame. Front or angled views distort the joint
   angles the rules depend on.
+- **Landmarks outside the frame make a metric unmeasurable, not wrong.** When the hands leave
+  the frame, the pose model still reports a wrist position, extrapolated from the body with no
+  warning. Any metric whose extreme value came from such a frame is reported as "could not
+  evaluate" instead of a plausible guess. In three training clips the wrists are out of frame
+  most of the time, so lockout can't be judged there; in one, the elbow also leaves the frame
+  at the bottom of every rep, so depth can't be judged either.
+- **Pike reps are measured poorly.** Depth is the angle of the upper arm, seen from the side.
+  With the hips piked, the elbows point toward the camera, so the upper arm is seen almost
+  end-on: it shrinks on screen from ~125 to ~50 pixels, and the angle of such a short segment
+  stays steep even when the shoulder drops close to elbow height. Pike reps therefore read as
+  shallow when they aren't, and one pike rep in the training set isn't counted at all. A
+  height-based depth signal fixed the pike clip but miscounted three others, so it was
+  rejected. Measuring this properly needs a second camera angle or 3D pose.
+- **A failed rep can look like a completed rep with bent arms.** A rep counts when the arms
+  climb back most of the way relative to the clip's typical rep. A failed rep that gets halfway
+  up before collapsing climbed back 0.64 of a typical rep; a completed rep without lockout in
+  another clip, 0.63. The arm signal only records how far up the person got, not whether they
+  meant to finish, so no threshold separates the two. For the same reason, collapsing flat onto
+  the floor and then pushing up to straight arms looks exactly like a rep.
+- **A single rep can't be analyzed.** A rep's start and end are cut at the clip's typical
+  descent and ascent, learned from the gaps between reps; with one rep there are none, and the
+  rep's edges can't be told apart from getting down and getting up. The pipeline reports this
+  instead of guessing.
+- **Failed reps are not analyzed.** They are excluded from the labels, so nothing measures them.
 - **Head position and tempo are measurable but not implemented.** Both are stretch goals.

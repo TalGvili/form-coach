@@ -39,3 +39,6 @@ select = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Put the repo root on the import path so tests can `import pipeline`. `python -m pytest`
+# does this by itself; plain `pytest` (which CI runs) does not.
+pythonpath = ["."]

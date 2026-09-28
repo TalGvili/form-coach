@@ -123,7 +123,7 @@ def hip_deviation_series(landmarks: np.ndarray, side: Side) -> np.ndarray:
     return np.where(np.abs(run) < 1e-6, np.nan, signed)
 
 
-def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
+def runs(mask: np.ndarray) -> list[tuple[int, int]]:
     """Each continuous run of True in a boolean array, as (start, stop), stop exclusive.
 
     np.diff marks +1 where a run starts and -1 where it ends. Padding with a False at
@@ -144,10 +144,10 @@ def in_position_window(tilt: np.ndarray, max_tilt_deg: float) -> tuple[int, int]
     """
     # unknown tilt counts as standing, so frames without data are excluded
     horizontal = np.nan_to_num(tilt, nan=90.0) < max_tilt_deg
-    runs = _runs(horizontal)
-    if not runs:
+    stretches = runs(horizontal)
+    if not stretches:
         return 0, len(tilt)
-    return max(runs, key=lambda run: run[1] - run[0])
+    return max(stretches, key=lambda run: run[1] - run[0])
 
 
 def interpolate_gaps(signal: np.ndarray, max_gap: int) -> np.ndarray:
@@ -160,7 +160,7 @@ def interpolate_gaps(signal: np.ndarray, max_gap: int) -> np.ndarray:
     filled = signal.copy()
     missing = np.isnan(signal)
     known = np.flatnonzero(~missing)
-    for start, stop in _runs(missing):
+    for start, stop in runs(missing):
         # only interior gaps can be interpolated; leading and trailing runs have no
         # value on one side to interpolate from
         if stop - start > max_gap or start == 0 or stop == len(signal):
@@ -179,7 +179,7 @@ def smooth(signal: np.ndarray, fps: float, window_s: float, polyorder: int = 2) 
     """
     window = int(fps * window_s) | 1  # forced odd, as savgol_filter requires
     out = signal.copy()
-    for start, stop in _runs(~np.isnan(signal)):
+    for start, stop in runs(~np.isnan(signal)):
         if stop - start > window:
             out[start:stop] = savgol_filter(signal[start:stop], window, polyorder)
     return out

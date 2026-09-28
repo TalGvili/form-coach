@@ -586,7 +586,7 @@ def fig_runs() -> None:
     mask = np.array([0, 1, 1, 1, 0, 0, 1, 1, 0], dtype=bool)
     padded = np.r_[0, mask.astype(int), 0]
     diff = np.diff(padded)
-    runs = signals._runs(mask)
+    runs = signals.runs(mask)
 
     fig, ax = plt.subplots(figsize=(11, 4.6))
     ax.set_xlim(-8.2, 10.2)
@@ -671,7 +671,7 @@ def fig_in_position() -> None:
     tilt = tilt + rng.normal(0, 1.2, tilt.size)
     t = np.arange(tilt.size) / fps
     lo, hi = signals.in_position_window(tilt, max_tilt_deg=35.0)
-    stray = [r for r in signals._runs(tilt < 35.0) if r != (lo, hi)]
+    stray = [r for r in signals.runs(tilt < 35.0) if r != (lo, hi)]
 
     fig, ax = plt.subplots(figsize=(11, 4.0))
     ax.grid(axis="y", color=GRID, lw=0.8)

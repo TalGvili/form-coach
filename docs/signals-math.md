@@ -18,7 +18,7 @@ are therefore the numbers the code produces.
 4. [Why there are two arm angles](#4-why-there-are-two-arm-angles)
 5. [Torso tilt](#5-torso-tilt--torso_tilt_series)
 6. [Hip deviation](#6-hip-deviation--hip_deviation_series)
-7. [Finding runs](#7-finding-runs--_runs)
+7. [Finding runs](#7-finding-runs--runs)
 8. [The in-position window](#8-the-in-position-window--in_position_window)
 9. [Filling gaps](#9-filling-gaps--interpolate_gaps)
 10. [Smoothing](#10-smoothing--smooth)
@@ -274,10 +274,10 @@ prevents a crash; it doesn't make the result meaningful.
 
 ---
 
-## 7. Finding runs — `_runs`
+## 7. Finding runs — `runs`
 
 Three functions need the same step: given a True/False value for each frame, find each
-continuous stretch of `True`. The helper `_runs` does it with one NumPy trick:
+continuous stretch of `True`. The function `runs` does it with one NumPy trick:
 
 ![The run-finding trick: pad the mask, take np.diff, read starts at +1 and stops at -1](figures/signals/runs.png)
 
@@ -408,7 +408,7 @@ Two details:
 | `upper_arm_angle_series` | atan2(\|dy\|, \|dx\|) of shoulder → elbow | `shallow`, and finding reps |
 | `torso_tilt_series` | atan2(\|dy\|, \|dx\|) of shoulder → ankle | the in-position window |
 | `hip_deviation_series` | 180° − hip angle, signed by hip y vs line y | `hip_sag`, `hip_pike` |
-| `_runs` | `np.diff` on a padded mask | the three functions below |
+| `runs` | `np.diff` on a padded mask | the three functions below |
 | `in_position_window` | longest run of tilt below the threshold | ignoring setup and getting up |
 | `interpolate_gaps` | straight line across short interior gaps | short detection dropouts |
 | `smooth` | Savitzky–Golay, one run at a time | steady threshold tests (durations), without flattening dips |

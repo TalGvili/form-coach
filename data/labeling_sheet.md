@@ -15,6 +15,8 @@ One row per rep: 20 clips x 8 reps \= 160 rows. Every flag starts at 0 — chang
 
 Apply the same written rule every time, and label what actually happened on video, not what you meant to do. Clip names match clip01.mp4–clip20.mp4. If a clip has fewer than 8 reps, delete its extra rows; if it has more, add rows below it.
 
+Two people perform in the dataset: person A in clip01–clip17, person B in clip18–clip20.
+
 ## **Labels**
 
 | clip | rep | shallow | hip\_sag | hip\_pike | no\_lockout | comment |

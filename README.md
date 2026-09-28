@@ -36,7 +36,8 @@ labels and the evaluation method can still be inspected.
 
 ## Dataset and labeling
 
-20 side-view clips of push-ups, labeled one row per rep. `data/labeling_sheet.md` is the
+20 side-view clips of push-ups by two people (person A in clip01–17, person B in
+clip18–20), labeled one row per rep. `data/labeling_sheet.md` is the
 hand-written record; `data/labels.csv` is generated from it by `scripts/labels_from_md.py`
 and regenerated after every relabel, so the two never drift apart.
 
@@ -100,15 +101,18 @@ numbers describe performance on video that was never used for tuning.
 One cost is worth stating: clip10 holds 8 of the 13 isolated `hip_sag` reps, leaving 5 for
 tuning. A test set with only one sag rep would have been worse.
 
+Person B's clips split as one for tuning (clip19) and two held out (clip18, clip20), so the
+held-out results are also reported per person: 20 reps from person B against 29 from person A.
+
 ## Limitations
 
 What the method structurally cannot do, and why tuning won't fix it.
 
-- **Every clip shows the same person.** All 20 clips are of one person, with the faults
-  performed on purpose. Body proportions, clothing, and the way a fault looks when it happens
-  unintentionally all change the landmarks, and none of them vary in this dataset. The
-  held-out clips measure performance on unseen video of the same person, not on other people.
-  Only filming more people can fix this; tuning can't.
+- **Two people, with the faults performed on purpose.** Body proportions, clothing, and the
+  way a fault looks when it happens unintentionally all change the landmarks, and two people
+  barely sample that. The second person appears in one tuning clip and two held-out clips, so
+  the held-out results say something about a person the thresholds were barely tuned on, but
+  nothing about people in general. Only filming more people can fix this; tuning can't.
 - **A lower-back arch while the hips stay in line can't be measured.** The pose model has no
   landmarks along the spine, only shoulders and hips. Sag and pike are detectable because they
   move the hip landmark itself off the shoulder–ankle line; an arch does not.

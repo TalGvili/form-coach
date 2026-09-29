@@ -43,7 +43,43 @@ segmentation:
   hip_moving_fraction: 0.9
 
   # Hip sag / pike durations count the time the hip spends beyond this many degrees off the
-  # body line. Keep it equal to the hip rules' thresholds once those exist.
-  hip_duration_threshold_deg: 15
+  # body line. The hip rules below must use the same number, so it is defined once here
+  # (&hip_threshold) and reused there (*hip_threshold).
+  hip_duration_threshold_deg: &hip_threshold 15
 
-rules: {}
+# Fault rules (pipeline/rules.py). Each rule reads one Rep field (metric) and flags the rep
+# when the value is above max or below min. A NaN metric (a landmark outside the frame) is
+# "could not evaluate", never "no fault". Rule names match the columns of data/labels.csv,
+# so Phase 5 compares predictions with labels without a mapping table.
+# The values are starting guesses; Phase 5 replaces them with measured choices.
+rules:
+  shallow:
+    metric: min_upper_arm_angle
+    # 0 deg = upper arm parallel to the floor, the labelling rule's line. 5 deg of slack for
+    # landmark noise. Likely too tight: clean reps in clip16 read 6.5 and 6.8 deg, and
+    # smoothing lifts narrow dips. Tune together with smoothing_window_s.
+    max: 5
+    message: "Not reaching full depth"
+
+  hip_sag:
+    metric: max_hip_drop
+    max: *hip_threshold  # degrees below the shoulder-ankle line
+    duration_metric: hip_sag_duration_s
+    # A brief dip is noise or a wobble; the labelling rule says "a noticeable part of the
+    # rep". May miss clip04, whose sags are often shorter than this.
+    min_duration_s: 0.3
+    message: "Hips dropping — engage your core"
+
+  hip_pike:
+    metric: max_hip_rise
+    max: *hip_threshold  # degrees above the shoulder-ankle line
+    duration_metric: hip_pike_duration_s
+    min_duration_s: 0.3
+    message: "Hips too high — lower them into a straight line"
+
+  no_lockout:
+    metric: max_elbow_angle
+    # 180 deg = straight arm. The labelling rule ignores slight softness in the elbows.
+    # Clean reps seen as low as 158.5 deg (clip01 rep 1), so 160 may be tight.
+    min: 160
+    message: "Straighten your arms fully at the top"

@@ -511,6 +511,37 @@ Comment every threshold with why it has that value. The starting values are gues
 Rendering is here rather than in Phase 2 because the version worth writing is the one that
 shows faults. Written earlier, you build a plain skeleton viewer and then rewrite it.
 
+### Step 4 (optional, undecided): Feedback priority
+
+Coaches correct one thing at a time, body position first. On a rep with piked hips, "hips
+too high" is the useful cue; "not deep enough" on top of it is noise. It is also the cue the
+detector is worst at: with the hips piked, the upper arm is seen end-on and depth reads as
+shallow when it isn't (see the README limitations). A piked rep at full depth is essentially
+a pike push-up, a harder variation, and was hard to perform even on purpose while filming,
+so hiding depth on piked reps loses little.
+
+If adopted:
+
+1. Declare it in the YAML, on the rule that gets hidden, so reading one rule shows every
+   condition under which it is reported:
+   ```yaml
+   shallow:
+     metric: min_upper_arm_angle
+     max: 5
+     suppressed_by: [hip_pike]   # hips first; depth reads wrong on piked reps anyway
+   ```
+2. **The engine still evaluates every rule.** Suppression is applied when building the
+   feedback, not inside `evaluate()`: the fault is kept and marked suppressed. Measurement and
+   presentation stay separate, and Phase 5 can score the raw detector.
+3. A rule whose own result is "could not evaluate" suppresses nothing: an unmeasured pike is
+   not evidence of a pike.
+4. **Phase 5 reports both** `shallow` numbers: the raw detector, and the feedback after
+   suppression. Reporting only the second would hide a weak detector behind a product rule.
+
+Decide separately whether `hip_sag` suppresses `shallow` too. Depth on sagging reps is
+measured well, so that would drop correct information purely as a product choice: a
+legitimate one, but a different argument from the pike case.
+
 **Done when:** `python analyze.py data/videos/clip03.mp4` produces an annotated video plus
 a JSON report listing each rep's faults.
 

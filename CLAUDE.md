@@ -18,7 +18,8 @@ Full plan: @docs/form-coach-project-guide.md
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
   failed rep reads like a no-lockout rep; clip13: a pike rep's dip is too small).
 - Next: `pipeline/rules.py` and the `rules:` section of `configs/pushup.yaml`, with the
-  three outcomes: fault, no fault, could not evaluate (NaN).
+  three outcomes: fault, no fault, could not evaluate (NaN). Undecided: whether `hip_pike`
+  suppresses `shallow` in the feedback (guide, Phase 4 Step 4).
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).

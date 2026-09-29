@@ -125,13 +125,18 @@ What the method structurally cannot do, and why tuning won't fix it.
   evaluate" instead of a plausible guess. In three training clips the wrists are out of frame
   most of the time, so lockout can't be judged there; in one, the elbow also leaves the frame
   at the bottom of every rep, so depth can't be judged either.
-- **Pike reps are measured poorly.** Depth is the angle of the upper arm, seen from the side.
-  With the hips piked, the elbows point toward the camera, so the upper arm is seen almost
-  end-on: it shrinks on screen from ~125 to ~50 pixels, and the angle of such a short segment
-  stays steep even when the shoulder drops close to elbow height. Pike reps therefore read as
-  shallow when they aren't, and one pike rep in the training set isn't counted at all. A
-  height-based depth signal fixed the pike clip but miscounted three others, so it was
-  rejected. Measuring this properly needs a second camera angle or 3D pose.
+- **Depth isn't reliable on reps with piked hips.** Detecting the pike itself works: it uses
+  the hip's position against the shoulder–ankle line, which a side camera sees well. What
+  suffers is the depth reading on those reps. With the hips piked, the elbows point toward
+  the camera, so the upper arm is seen almost end-on: it shrinks on screen from ~125 to ~50
+  pixels, and the angle of such a short segment stays steep even when the shoulder drops
+  close to elbow height. A piked rep can therefore read as shallow when it isn't, and one of
+  the 26 piked reps in the dataset isn't counted as a rep at all. Two alternatives were tried
+  and rejected: a height-based depth signal, and a 3D angle from the pose model's own depth
+  estimate. Both fixed the pike clip but miscounted three or four others. Measuring this
+  properly needs a second camera or real 3D pose. In practice it matters less than it
+  sounds: a piked rep at full depth is essentially a pike push-up, a harder variation, and
+  was hard to perform even on purpose while filming.
 - **A failed rep can look like a completed rep with bent arms.** A rep counts when the arms
   climb back most of the way relative to the clip's typical rep. A failed rep that gets halfway
   up before collapsing climbed back 0.64 of a typical rep; a completed rep without lockout in

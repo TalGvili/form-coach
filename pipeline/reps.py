@@ -34,6 +34,7 @@ class RepConfig:
     smoothing_window_s: float
     min_prominence_fraction: float
     min_rep_spacing_s: float
+    min_range_deg: float
     min_return_fraction: float
     hip_moving_fraction: float
     hip_duration_threshold_deg: float
@@ -64,7 +65,11 @@ class ClipSignals:
 
 
 def find_rep_bottoms(
-    depth: np.ndarray, fps: float, min_prominence_fraction: float, min_rep_spacing_s: float
+    depth: np.ndarray,
+    fps: float,
+    min_prominence_fraction: float,
+    min_rep_spacing_s: float,
+    min_range_deg: float,
 ) -> np.ndarray:
     """Frame indices where the depth signal dips, one per rep.
 
@@ -72,11 +77,16 @@ def find_rep_bottoms(
     the signal's own range (5th to 95th percentile), so it does not depend on camera distance
     or on how deep this person goes. Unknown frames take the highest value, so they can
     never be mistaken for a bottom.
+
+    A share of nothing is nothing: when the arm barely moves all clip, the range is only
+    jitter and so is every dip. Below min_range_deg the clip has no reps.
     """
     if np.isnan(depth).all():
         return np.array([], dtype=int)
     filled = np.where(np.isnan(depth), np.nanmax(depth), depth)
     spread = np.percentile(filled, 95) - np.percentile(filled, 5)
+    if spread < min_range_deg:
+        return np.array([], dtype=int)
     bottoms, _ = find_peaks(
         -filled,
         prominence=spread * min_prominence_fraction,
@@ -246,7 +256,11 @@ def segment_reps(landmarks: np.ndarray, info: VideoInfo, cfg: RepConfig) -> list
 
     # search only inside the window, then shift back to frame numbers in the whole clip
     bottoms = start + find_rep_bottoms(
-        s.depth[start:stop], info.fps, cfg.min_prominence_fraction, cfg.min_rep_spacing_s
+        s.depth[start:stop],
+        info.fps,
+        cfg.min_prominence_fraction,
+        cfg.min_rep_spacing_s,
+        cfg.min_range_deg,
     )
     if len(bottoms) == 0:
         return []

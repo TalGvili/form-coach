@@ -59,6 +59,50 @@ class TestUpperArmAngle:
         )
 
 
+class TestElbowAngle:
+    """Checks the landmark order: the angle must sit at the elbow, between shoulder and wrist."""
+
+    def test_straight_arm_is_180(self):
+        landmarks = make_landmarks({11: (100.0, 100.0), 13: (100.0, 200.0), 15: (100.0, 300.0)})
+        assert signals.elbow_angle_series(landmarks, signals.LEFT)[0] == pytest.approx(180.0)
+
+    def test_bent_arm_is_90(self):
+        landmarks = make_landmarks({11: (100.0, 100.0), 13: (100.0, 200.0), 15: (200.0, 200.0)})
+        assert signals.elbow_angle_series(landmarks, signals.LEFT)[0] == pytest.approx(90.0)
+
+
+class TestTorsoTilt:
+    def test_horizontal_body_is_zero(self):
+        landmarks = make_landmarks({11: (100.0, 500.0), 27: (900.0, 500.0)})
+        assert signals.torso_tilt_series(landmarks, signals.LEFT)[0] == pytest.approx(0.0)
+
+    def test_standing_is_90(self):
+        landmarks = make_landmarks({11: (500.0, 100.0), 27: (500.0, 900.0)})
+        assert signals.torso_tilt_series(landmarks, signals.LEFT)[0] == pytest.approx(90.0)
+
+    def test_independent_of_facing(self):
+        head_left = make_landmarks({11: (100.0, 450.0), 27: (900.0, 500.0)})
+        head_right = make_landmarks({11: (900.0, 450.0), 27: (100.0, 500.0)})
+        assert signals.torso_tilt_series(head_left, signals.LEFT)[0] == pytest.approx(
+            signals.torso_tilt_series(head_right, signals.LEFT)[0]
+        )
+
+
+class TestRuns:
+    def test_finds_each_run_with_an_exclusive_stop(self):
+        mask = np.array([0, 1, 1, 1, 0, 0, 1, 1, 0], dtype=bool)
+        assert signals.runs(mask) == [(1, 4), (6, 8)]
+
+    def test_runs_touching_both_ends(self):
+        # the padding is what lets a run start at 0 or end at len(mask)
+        mask = np.array([1, 1, 0, 1], dtype=bool)
+        assert signals.runs(mask) == [(0, 2), (3, 4)]
+
+    def test_all_true_and_all_false(self):
+        assert signals.runs(np.ones(5, dtype=bool)) == [(0, 5)]
+        assert signals.runs(np.zeros(5, dtype=bool)) == []
+
+
 class TestHipDeviation:
     """The sign convention decides hip_sag from hip_pike, so it gets the most tests."""
 

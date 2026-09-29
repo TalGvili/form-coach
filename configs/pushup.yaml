@@ -24,6 +24,12 @@ segmentation:
   # No two rep bottoms closer than this. The fastest reps filmed took ~1.4 s.
   min_rep_spacing_s: 0.8
 
+  # If the upper-arm range (5th-95th percentile) over the whole window is below this, the
+  # clip has no reps: the relative prominence above would otherwise accept jitter dips.
+  # Smallest range with real reps: 15 deg (clip03, piked and shallow); a held pause at the
+  # top spans ~6 deg (clip11).
+  min_range_deg: 10
+
   # A rep counts only if the person climbs back up at least this share of a typical rep.
   # Measured: a failed rep 0.33, the lowest completed rep 0.52. A second failed rep (0.64)
   # cannot be told apart from a no-lockout rep (0.63) by this signal.

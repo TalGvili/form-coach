@@ -27,6 +27,7 @@ CFG = RepConfig(
     smoothing_window_s=0.4,
     min_prominence_fraction=0.3,
     min_rep_spacing_s=0.8,
+    min_range_deg=10,
     min_return_fraction=0.45,
     hip_moving_fraction=0.9,
     hip_duration_threshold_deg=15,
@@ -109,11 +110,19 @@ def test_find_rep_bottoms_counts_eight_reps():
     t = np.linspace(0, 16, 480)  # 16 s at 30 fps
     signal = 125 + 45 * np.cos(2 * np.pi * t / 2)
     signal += np.random.default_rng(0).normal(0, 3, t.size)
-    assert len(find_rep_bottoms(signal, 30.0, 0.3, 0.8)) == 8
+    assert len(find_rep_bottoms(signal, 30.0, 0.3, 0.8, 10)) == 8
 
 
 def test_find_rep_bottoms_on_a_flat_signal_finds_nothing():
-    assert len(find_rep_bottoms(np.full(100, 50.0), 30.0, 0.3, 0.8)) == 0
+    assert len(find_rep_bottoms(np.full(100, 50.0), 30.0, 0.3, 0.8, 10)) == 0
+
+
+def test_find_rep_bottoms_ignores_jitter_when_nothing_moves():
+    """A 2-degree wobble has dips too, and each spans far more than 30% of a 4-degree range."""
+    t = np.linspace(0, 16, 480)
+    wobble = 85 + 2 * np.sin(2 * np.pi * t / 1.5)
+    assert len(find_rep_bottoms(wobble, 30.0, 0.3, 0.8, 10)) == 0
+    assert len(find_rep_bottoms(wobble, 30.0, 0.3, 0.8, 0)) > 0  # what happened before
 
 
 def test_finds_every_rep_and_ignores_standing():
@@ -185,6 +194,36 @@ def test_the_hip_moving_while_the_arms_rest_at_the_top_is_ignored():
     reps = segment_reps(landmarks, INFO, CFG)
     assert reps[0].max_hip_rise < 5
     assert reps[1].max_hip_rise < 5
+
+
+def test_a_piking_rep_has_a_positive_rise_and_a_duration():
+    """The pike mirror of the sag test: a negative sag raises the hip above the body line."""
+    reps = segment_reps(synthetic_clip([0.0] * 5, sags=[0, -80, 0, 0, 0]), INFO, CFG)
+    piking = reps[1]
+    assert piking.max_hip_rise > CFG.hip_duration_threshold_deg
+    assert 0.5 < piking.hip_pike_duration_s < 1.1
+    assert piking.max_hip_drop == pytest.approx(0, abs=1)
+    for rep in reps[:1] + reps[2:]:
+        assert rep.max_hip_rise < 5
+        assert rep.hip_pike_duration_s == 0
+
+
+def test_a_clip_without_push_ups_has_no_reps():
+    """Standing, a plank held still, standing: nothing dips, so nothing is a rep."""
+    landmarks = synthetic_clip([0.0] * 3)
+    plank = landmarks[int(FPS) + 1]  # a frame from the first plank hold
+    landmarks[int(FPS) : -int(FPS)] = plank
+    assert segment_reps(landmarks, INFO, CFG) == []
+
+
+def test_a_hip_never_detected_gives_nan_hip_metrics():
+    """No hip values in a rep at all: "could not measure", not a crash."""
+    landmarks = synthetic_clip([0.0] * 4)
+    landmarks[:, L.hip, :2] = np.nan
+    reps = segment_reps(landmarks, INFO, CFG)
+    assert len(reps) == 4
+    assert all(np.isnan(r.max_hip_drop) and np.isnan(r.hip_sag_duration_s) for r in reps)
+    assert all(np.isnan(r.max_hip_rise) and np.isnan(r.hip_pike_duration_s) for r in reps)
 
 
 def test_a_wrist_outside_the_frame_gives_nan_elbow_metrics():

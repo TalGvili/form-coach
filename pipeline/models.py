@@ -1,4 +1,11 @@
-"""Core dataclasses passed between pipeline stages: VideoInfo, Rep, Fault, SessionResult."""
+"""Core dataclasses passed between pipeline stages: VideoInfo, Rep, Fault, Unevaluated,
+SessionResult.
+
+A type lives here when one module creates it and another uses it: these are the contracts
+between stages. A type used only inside one module (its settings, like RepConfig and Rule,
+or internal bundles, like ClipSignals) lives next to its code. This file imports only
+dataclasses, so every module can import it and it can never be part of an import cycle.
+"""
 
 from dataclasses import dataclass
 
@@ -25,7 +32,7 @@ class Rep:
     start_frame: int
     bottom_frame: int
     end_frame: int
-    min_elbow_angle: float  # depth (shallow)
+    min_elbow_angle: float  # depth, elbow-based (diagnostic; shallow uses the upper arm)
     min_upper_arm_angle: float  # 0 = upper arm parallel to floor (shallow)
     max_elbow_angle: float  # lockout at the top (no_lockout)
     max_hip_drop: float  # hip below the body line (hip_sag)
@@ -43,8 +50,18 @@ class Fault:
     frames: tuple[int, int]
 
 
+@dataclass(frozen=True)
+class Unevaluated:
+    """A rule that could not be checked on a rep, because its metric is NaN (a landmark it
+    needs was outside the frame). Not a fault, and not a pass either."""
+
+    rep_index: int
+    rule: str
+
+
 @dataclass
 class SessionResult:
     video: VideoInfo
     reps: list[Rep]
     faults: list[Fault]
+    unevaluated: list[Unevaluated]

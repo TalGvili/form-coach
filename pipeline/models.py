@@ -43,11 +43,15 @@ class Rep:
 
 @dataclass(frozen=True)
 class Fault:
+    """A rule the rep broke. suppressed: a higher-priority fault on the same rep hides it
+    from the feedback; it is kept so evaluation can still score the raw detector."""
+
     rep_index: int
     rule: str
     message: str
     value: float
     frames: tuple[int, int]
+    suppressed: bool = False
 
 
 @dataclass(frozen=True)

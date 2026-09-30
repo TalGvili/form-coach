@@ -10,7 +10,7 @@ False, so without it an unmeasured rep would silently count as clean.
 """
 
 import math
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
 
 import yaml
@@ -31,6 +31,7 @@ class Rule:
     max: float | None = None
     duration_metric: str | None = None
     min_duration_s: float | None = None
+    suppressed_by: tuple[str, ...] = ()  # rules whose fault on the same rep hides this one
 
 
 def load_rules(path: Path) -> list[Rule]:
@@ -38,12 +39,19 @@ def load_rules(path: Path) -> list[Rule]:
 
     An unknown key raises a TypeError from the Rule constructor. The checks below catch the
     mistakes the constructor can't: a metric that is not a Rep field, a rule with no bounds,
-    and a duration half-specified.
+    a duration half-specified, and suppressed_by naming a rule that doesn't exist.
     """
     with path.open(encoding="utf-8") as handle:
         section = yaml.safe_load(handle)["rules"]
-    rules = [Rule(name=name, **spec) for name, spec in section.items()]
+    rules = [
+        Rule(name=name, **{**spec, "suppressed_by": tuple(spec.get("suppressed_by", ()))})
+        for name, spec in section.items()
+    ]
+    names = {rule.name for rule in rules}
     for rule in rules:
+        for other in rule.suppressed_by:
+            if other not in names or other == rule.name:
+                raise ValueError(f"rule {rule.name!r}: can't be suppressed by {other!r}")
         for metric in (rule.metric, rule.duration_metric):
             if metric is not None and metric not in REP_FIELDS:
                 raise ValueError(f"rule {rule.name!r}: {metric!r} is not a Rep field")
@@ -84,3 +92,20 @@ def evaluate(reps: list[Rep], rules: list[Rule]) -> tuple[list[Fault], list[Unev
             elif isinstance(result, Unevaluated):
                 unevaluated.append(result)
     return faults, unevaluated
+
+
+def mark_suppressed(faults: list[Fault], rules: list[Rule]) -> list[Fault]:
+    """Mark each fault that a higher-priority fault on the same rep hides from the feedback.
+
+    Coaches correct one thing at a time. Nothing is removed: evaluate() already judged every
+    rule, and evaluation scores both the raw detector and the feedback. Only a fault
+    suppresses; an unevaluated rule is not evidence of anything.
+    """
+    fired = {(fault.rep_index, fault.rule) for fault in faults}
+    hidden_by = {rule.name: rule.suppressed_by for rule in rules}
+    return [
+        replace(fault, suppressed=True)
+        if any((fault.rep_index, other) in fired for other in hidden_by[fault.rule])
+        else fault
+        for fault in faults
+    ]

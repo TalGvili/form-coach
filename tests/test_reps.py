@@ -5,6 +5,8 @@ number of push-ups, a plank, standing. Each push-up's depth, how straight the ar
 the top, and how far the hip sags are all chosen by the test.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -235,5 +237,5 @@ def test_a_wrist_outside_the_frame_gives_nan_elbow_metrics():
     assert not any(np.isnan(r.min_upper_arm_angle) for r in reps)  # depth needs no wrist
 
 
-def test_the_config_file_matches_repconfig():
-    assert isinstance(load_config(), RepConfig)
+def test_the_config_file_matches_repconfig(config_path: Path):
+    assert isinstance(load_config(config_path), RepConfig)

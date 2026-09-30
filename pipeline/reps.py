@@ -22,8 +22,6 @@ from pipeline import signals
 from pipeline.landmarks import load_or_extract
 from pipeline.models import Rep, VideoInfo
 
-CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs" / "pushup.yaml"
-
 
 @dataclass(frozen=True)
 class RepConfig:
@@ -40,7 +38,7 @@ class RepConfig:
     hip_duration_threshold_deg: float
 
 
-def load_config(path: Path = CONFIG_PATH) -> RepConfig:
+def load_config(path: Path) -> RepConfig:
     """Read the segmentation settings. A missing or misspelled key raises a TypeError."""
     with path.open(encoding="utf-8") as handle:
         return RepConfig(**yaml.safe_load(handle)["segmentation"])
@@ -280,12 +278,13 @@ def segment_reps(landmarks: np.ndarray, info: VideoInfo, cfg: RepConfig) -> list
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 1:
-        print("usage: python -m pipeline.reps <video>", file=sys.stderr)
+    if len(argv) not in (1, 2):
+        print("usage: python -m pipeline.reps <video> [config]", file=sys.stderr)
         return 2
+    config = Path(argv[1] if len(argv) == 2 else "configs/pushup.yaml")
     info, landmarks = load_or_extract(argv[0])
     try:
-        reps = segment_reps(landmarks, info, load_config())
+        reps = segment_reps(landmarks, info, load_config(config))
     except SingleRepError as error:
         print(f"{info.path}: {error}", file=sys.stderr)
         return 1

@@ -12,16 +12,19 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 4 (rule engine and feedback)
+- Phase: 5 (evaluation). Phase 4 is done.
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
   `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
   failed rep reads like a no-lockout rep; clip13: a pike rep's dip is too small).
-- Phase 4 so far: the `rules:` config and `rules.py` (three outcomes: fault, no fault,
-  could not evaluate) with tests.
-- Next: `analyze.py` (video -> reps -> rules -> `SessionResult`, printed and saved as JSON),
-  then `render.py`. Undecided: whether `hip_pike` suppresses `shallow` in the feedback
-  (guide, Phase 4 Step 4).
+- Phase 4: `rules.py` (three outcomes: fault, no fault, could not evaluate; `hip_pike`
+  suppresses `shallow` in the feedback, marked not removed). `pipeline/session.py` holds
+  `analyze(video, config) -> SessionResult`, the one function both entry points call.
+  `analyze.py` is the command line: prints the report, saves JSON to `data/reports/`, and
+  with `--render` an annotated video (`pipeline/render.py`).
+- Next: `eval/evaluate.py`. Score both the raw detector and the feedback after suppression;
+  exclude clip13 from the per-rep join (its reps are shifted after rep 3). Held-out clips
+  only once tuning is finished.
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).

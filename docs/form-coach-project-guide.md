@@ -511,7 +511,7 @@ Comment every threshold with why it has that value. The starting values are gues
 Rendering is here rather than in Phase 2 because the version worth writing is the one that
 shows faults. Written earlier, you build a plain skeleton viewer and then rewrite it.
 
-### Step 4 (optional, undecided): Feedback priority
+### Step 4: Feedback priority (adopted for `hip_pike` over `shallow`)
 
 Coaches correct one thing at a time, body position first. On a rep with piked hips, "hips
 too high" is the useful cue; "not deep enough" on top of it is noise. It is also the cue the
@@ -520,7 +520,7 @@ shallow when it isn't (see the README limitations). A piked rep at full depth is
 a pike push-up, a harder variation, and was hard to perform even on purpose while filming,
 so hiding depth on piked reps loses little.
 
-If adopted:
+How it is built:
 
 1. Declare it in the YAML, on the rule that gets hidden, so reading one rule shows every
    condition under which it is reported:

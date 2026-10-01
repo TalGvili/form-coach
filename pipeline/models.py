@@ -26,6 +26,9 @@ class Rep:
     All angles are in degrees; `_s` marks a value in seconds. Frame indices are
     absolute positions in the source video. Field names are the `metric:` values the
     YAML rules look up, so renaming one here means renaming it in the config too.
+
+    Every metric a rule can use has a `<metric>_frame`: the frame its value came from, so a
+    fault can be shown at the moment it happened. rules.load_rules checks the pairing.
     """
 
     index: int
@@ -39,18 +42,26 @@ class Rep:
     max_hip_rise: float  # hip above the body line (hip_pike)
     hip_sag_duration_s: float
     hip_pike_duration_s: float
+    min_elbow_angle_frame: int
+    min_upper_arm_angle_frame: int  # always bottom_frame; kept so every metric has a frame
+    max_elbow_angle_frame: int  # the top the rep rises to
+    max_hip_drop_frame: int
+    max_hip_rise_frame: int
 
 
 @dataclass(frozen=True)
 class Fault:
-    """A rule the rep broke. suppressed: a higher-priority fault on the same rep hides it
-    from the feedback; it is kept so evaluation can still score the raw detector."""
+    """A rule the rep broke. frames: the whole rep; frame: the moment the measured value
+    came from (the bottom for depth, the top for lockout). suppressed: a higher-priority
+    fault on the same rep hides it from the feedback; it is kept so evaluation can still
+    score the raw detector."""
 
     rep_index: int
     rule: str
     message: str
     value: float
     frames: tuple[int, int]
+    frame: int
     suppressed: bool = False
 
 

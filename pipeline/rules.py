@@ -22,11 +22,13 @@ REP_FIELDS = {f.name for f in fields(Rep)}
 
 @dataclass(frozen=True)
 class Rule:
-    """One entry of the config's `rules:` section. The name is the YAML key."""
+    """One entry of the config's `rules:` section. The name is the YAML key and matches the
+    labels.csv column; the title is how the check is named to a user ("Arm lockout")."""
 
     name: str
     metric: str
     message: str
+    title: str
     min: float | None = None
     max: float | None = None
     duration_metric: str | None = None
@@ -38,8 +40,9 @@ def load_rules(path: Path) -> list[Rule]:
     """Read the `rules:` section, failing at load time rather than halfway through a video.
 
     An unknown key raises a TypeError from the Rule constructor. The checks below catch the
-    mistakes the constructor can't: a metric that is not a Rep field, a rule with no bounds,
-    a duration half-specified, and suppressed_by naming a rule that doesn't exist.
+    mistakes the constructor can't: a metric that is not a Rep field or has no `_frame`
+    partner, a rule with no bounds, a duration half-specified, and suppressed_by naming a
+    rule that doesn't exist.
     """
     with path.open(encoding="utf-8") as handle:
         section = yaml.safe_load(handle)["rules"]
@@ -55,6 +58,8 @@ def load_rules(path: Path) -> list[Rule]:
         for metric in (rule.metric, rule.duration_metric):
             if metric is not None and metric not in REP_FIELDS:
                 raise ValueError(f"rule {rule.name!r}: {metric!r} is not a Rep field")
+        if f"{rule.metric}_frame" not in REP_FIELDS:
+            raise ValueError(f"rule {rule.name!r}: Rep has no {rule.metric}_frame")
         if rule.min is None and rule.max is None:
             raise ValueError(f"rule {rule.name!r}: needs min, max or both")
         if (rule.duration_metric is None) != (rule.min_duration_s is None):
@@ -77,7 +82,14 @@ def check(rule: Rule, rep: Rep) -> Fault | Unevaluated | None:
             return Unevaluated(rep.index, rule.name)
         if duration < rule.min_duration_s:
             return None  # past the bound, but too briefly to count
-    return Fault(rep.index, rule.name, rule.message, value, (rep.start_frame, rep.end_frame))
+    return Fault(
+        rep_index=rep.index,
+        rule=rule.name,
+        message=rule.message,
+        value=value,
+        frames=(rep.start_frame, rep.end_frame),
+        frame=getattr(rep, f"{rule.metric}_frame"),  # when it happened
+    )
 
 
 def evaluate(reps: list[Rep], rules: list[Rule]) -> tuple[list[Fault], list[Unevaluated]]:

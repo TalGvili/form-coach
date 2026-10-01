@@ -242,6 +242,11 @@ def measure_rep(
         max_hip_rise=max_hip_rise,
         hip_sag_duration_s=float("nan") if np.isnan(max_hip_drop) else sag_s,
         hip_pike_duration_s=float("nan") if np.isnan(max_hip_rise) else pike_s,
+        min_elbow_angle_frame=low_elbow_at,
+        min_upper_arm_angle_frame=bottom,
+        max_elbow_angle_frame=high_elbow_at,
+        max_hip_drop_frame=drop_at,
+        max_hip_rise_frame=rise_at,
     )
 
 

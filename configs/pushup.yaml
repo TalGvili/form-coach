@@ -52,10 +52,11 @@ segmentation:
 # "could not evaluate", never "no fault". Rule names match the columns of data/labels.csv,
 # so Phase 5 compares predictions with labels without a mapping table.
 # The values are starting guesses; Phase 5 replaces them with measured choices.
-# Messages are drawn on the annotated video, whose fonts only have ASCII: no dashes or quotes
-# beyond the keyboard ones.
+# title names the check to a user; message tells them what to fix. Both are drawn on the
+# annotated video, whose fonts only have ASCII: no dashes or quotes beyond the keyboard ones.
 rules:
   shallow:
+    title: "Depth"
     metric: min_upper_arm_angle
     # 0 deg = upper arm parallel to the floor, the labelling rule's line. 5 deg of slack for
     # landmark noise. Likely too tight: clean reps in clip16 read 6.5 and 6.8 deg, and
@@ -68,6 +69,7 @@ rules:
     message: "Not reaching full depth"
 
   hip_sag:
+    title: "Hip sag"
     metric: max_hip_drop
     max: *hip_threshold  # degrees below the shoulder-ankle line
     duration_metric: hip_sag_duration_s
@@ -77,6 +79,7 @@ rules:
     message: "Hips dropping: engage your core"
 
   hip_pike:
+    title: "Hip pike"
     metric: max_hip_rise
     max: *hip_threshold  # degrees above the shoulder-ankle line
     duration_metric: hip_pike_duration_s
@@ -84,6 +87,7 @@ rules:
     message: "Hips too high: lower them into a straight line"
 
   no_lockout:
+    title: "Arm lockout"
     metric: max_elbow_angle
     # 180 deg = straight arm. The labelling rule ignores slight softness in the elbows.
     # Clean reps seen as low as 158.5 deg (clip01 rep 1), so 160 may be tight.

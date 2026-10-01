@@ -155,6 +155,18 @@ def test_a_single_rep_is_refused_rather_than_guessed():
         segment_reps(synthetic_clip([0.0]), INFO, CFG)
 
 
+def test_each_metric_records_the_moment_it_came_from():
+    """The annotated video shows a fault at this frame, so it must be the right moment."""
+    reps = segment_reps(synthetic_clip([0.0, 40.0, 0.0, 40.0], sags=[0, 80, 0, 0]), INFO, CFG)
+    for rep in reps:
+        assert rep.min_upper_arm_angle_frame == rep.bottom_frame
+        # lockout is judged at the top the rep rises to: after the bottom, near the end
+        assert rep.bottom_frame < rep.max_elbow_angle_frame <= rep.end_frame
+        assert rep.end_frame - rep.max_elbow_angle_frame < 5
+    sagging = reps[1]
+    assert abs(sagging.max_hip_drop_frame - sagging.bottom_frame) < 5  # sag peaks at the bottom
+
+
 def test_a_failed_last_rep_is_not_counted():
     reps = segment_reps(synthetic_clip([0.0] * 5, failed_last=True), INFO, CFG)
     assert len(reps) == 5

@@ -23,13 +23,19 @@ CLEAN = Rep(
     max_hip_rise=0.0,
     hip_sag_duration_s=0.0,
     hip_pike_duration_s=0.0,
+    min_elbow_angle_frame=40,
+    min_upper_arm_angle_frame=40,
+    max_elbow_angle_frame=68,
+    max_hip_drop_frame=35,
+    max_hip_rise_frame=12,
 )
-SHALLOW = Rule("shallow", "min_upper_arm_angle", "Not deep enough", max=5)
-NO_LOCKOUT = Rule("no_lockout", "max_elbow_angle", "Straighten your arms", min=160)
+SHALLOW = Rule("shallow", "min_upper_arm_angle", "Not deep enough", "Depth", max=5)
+NO_LOCKOUT = Rule("no_lockout", "max_elbow_angle", "Straighten your arms", "Lockout", min=160)
 HIP_SAG = Rule(
     "hip_sag",
     "max_hip_drop",
     "Hips dropping",
+    "Hip sag",
     max=15,
     duration_metric="hip_sag_duration_s",
     min_duration_s=0.3,
@@ -44,9 +50,11 @@ class TestCheck:
     def test_a_clean_rep_passes_every_rule(self):
         assert all(check(rule, CLEAN) is None for rule in (SHALLOW, NO_LOCKOUT, HIP_SAG))
 
-    def test_above_max_is_a_fault_on_the_rep_frames(self):
+    def test_above_max_is_a_fault_at_the_moment_its_value_came_from(self):
         fault = check(SHALLOW, rep(min_upper_arm_angle=20.0))
-        assert fault == Fault(1, "shallow", "Not deep enough", 20.0, (10, 70))
+        assert fault == Fault(1, "shallow", "Not deep enough", 20.0, (10, 70), frame=40)
+        lockout = check(NO_LOCKOUT, rep(max_elbow_angle=140.0))
+        assert lockout.frame == 68  # the top, not the start of the rep
 
     def test_below_min_is_a_fault(self):
         assert isinstance(check(NO_LOCKOUT, rep(max_elbow_angle=140.0)), Fault)
@@ -83,7 +91,7 @@ def test_evaluate_sorts_every_rep_and_rule_into_three_outcomes():
 
 class TestMarkSuppressed:
     SHALLOW_UNLESS_PIKE = dataclasses.replace(SHALLOW, suppressed_by=("hip_pike",))
-    HIP_PIKE = Rule("hip_pike", "max_hip_rise", "Hips too high", max=15)
+    HIP_PIKE = Rule("hip_pike", "max_hip_rise", "Hips too high", "Hip pike", max=15)
     RULES = [SHALLOW_UNLESS_PIKE, HIP_PIKE]
 
     def faults(self, **changes: float) -> list[Fault]:
@@ -123,8 +131,9 @@ class TestLoadRules:
         threshold = load_config(config_path).hip_duration_threshold_deg
         assert hip["hip_sag"].max == hip["hip_pike"].max == threshold
 
-    def test_messages_are_ascii_so_the_video_can_draw_them(self, config_path: Path):
-        assert all(rule.message.isascii() for rule in load_rules(config_path))
+    def test_messages_and_titles_are_ascii_so_the_video_can_draw_them(self, config_path: Path):
+        rules = load_rules(config_path)
+        assert all(rule.message.isascii() and rule.title.isascii() for rule in rules)
 
     def test_shallow_gives_way_to_pike_only(self, config_path: Path):
         suppressed_by = {r.name: r.suppressed_by for r in load_rules(config_path)}
@@ -135,6 +144,10 @@ class TestLoadRules:
         ("spec", "complaint"),
         [
             ({"metric": "max_hip_dorp", "max": 15, "message": "m"}, "not a Rep field"),
+            (
+                {"metric": "hip_sag_duration_s", "max": 1, "message": "m"},
+                "no hip_sag_duration_s_frame",
+            ),
             ({"metric": "max_hip_drop", "message": "m"}, "needs min, max"),
             (
                 {"metric": "max_hip_drop", "max": 15, "min_duration_s": 0.3, "message": "m"},
@@ -153,6 +166,7 @@ class TestLoadRules:
     )
     def test_a_broken_rule_fails_at_load_time(self, tmp_path: Path, spec: dict, complaint: str):
         path = tmp_path / "config.yaml"
+        spec = {"title": "t", **spec}  # every rule needs one; each case breaks something else
         path.write_text(yaml.safe_dump({"rules": {"broken": spec}}), encoding="utf-8")
         with pytest.raises(ValueError, match=complaint):
             load_rules(path)

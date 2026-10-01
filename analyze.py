@@ -14,6 +14,7 @@ from pathlib import Path
 from pipeline.models import SessionResult
 from pipeline.render import render
 from pipeline.reps import SingleRepError
+from pipeline.rules import load_rules
 from pipeline.session import analyze, to_json
 
 REPORTS_DIR = Path(__file__).resolve().parent / "data" / "reports"
@@ -69,7 +70,8 @@ def main(argv: list[str]) -> int:
     print(f"saved {report}")
     if args.render:
         annotated = REPORTS_DIR / f"{args.video.stem}_annotated.mp4"
-        render(result, annotated)
+        titles = {rule.name: rule.title for rule in load_rules(args.config)}
+        render(result, titles, annotated)
         print(f"saved {annotated}")
     return 0
 

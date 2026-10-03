@@ -12,7 +12,7 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 5 (evaluation). Phase 4 is done.
+- Phase: 6 (web app). Phases 4 and 5 are done.
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
   `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
@@ -22,9 +22,10 @@ Full plan: @docs/form-coach-project-guide.md
   `analyze(video, config) -> SessionResult`, the one function both entry points call.
   `analyze.py` is the command line: prints the report, saves JSON to `data/reports/`, and
   with `--render` an annotated video (`pipeline/render.py`).
-- Next: `eval/evaluate.py`. Score both the raw detector and the feedback after suppression;
-  exclude clip13 from the per-rep join (its reps are shifted after rep 3). Held-out clips
-  only once tuning is finished.
+- Phase 5: `eval/evaluate.py` and `eval/EXPERIMENTS.md` (experiments 1-12). Tuned on the
+  training clips; the held-out run was made ONCE at commit 3d5423a and its results are final.
+  Do not tune against the held-out clips or relabel them.
+- Next: Phase 6, the web app.
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).

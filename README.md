@@ -9,8 +9,8 @@ to track progress over time.
 Built with MediaPipe pose estimation, SciPy signal processing and a config-driven rule engine
 behind a FastAPI service.
 
-**Status:** in progress (Phase 4 — rule engine). Landmarks, signals and rep segmentation are
-done; rep counts match the labels on 12 of the 14 training clips. Not yet usable.
+**Status:** in progress. The analysis pipeline works from the command line and is evaluated
+(see Results); the web app is next.
 
 ## Setup
 
@@ -108,6 +108,51 @@ tuning. A test set with only one sag rep would have been worse.
 
 Person B's clips split as one for tuning (clip19) and two held out (clip18, clip20), so the
 held-out results are also reported per person: 20 reps from person B against 29 from person A.
+
+## Results
+
+Measured by `python -m eval.evaluate`. Every tuning step, with its numbers, is in
+[`eval/EXPERIMENTS.md`](eval/EXPERIMENTS.md).
+
+### Held-out clips (run once, after tuning was finished)
+
+Rep counting was correct on 4 of the 6 clips. The other two are left out of the per-rep
+scoring, since a missing or extra rep misaligns every rep after it: **36 reps from 4 clips.**
+
+| Fault | Detected | Missed | False alarms | Precision | Recall |
+| --- | --- | --- | --- | --- | --- |
+| `shallow` | 11 / 11 | 0 | 8 | 0.58 | 1.00 |
+| `hip_sag` | 8 / 8 | 0 | 3 | 0.73 | 1.00 |
+| `hip_pike` | 8 / 8 | 0 | 0 | 1.00 | 1.00 |
+| `no_lockout` | – | – | – | – | – |
+
+- **Nothing labelled was missed.** Every error is a false alarm or a counting failure.
+- **`no_lockout` has no held-out result:** its only held-out clip was one of the two miscounted.
+- **`shallow` is the weakest.** Depth is the angle of the upper arm seen from the side, and
+  posture changes how that angle looks on camera. 5 of its 8 false alarms come from the held-out
+  sag clip, where full-depth reps read 16–21°; only 4 full-depth sag reps were left for tuning.
+  The other 3 are piked reps, a known limitation (below), and the feedback hides them.
+- **Counting failed on the off-angle clip** (the arm's movement looked too small to be reps)
+  **and on the mirrored no-lockout clip**: 2 extra reps, one of them getting up off the floor
+  after the set, the other a hesitation between two reps.
+- Per person: person B, tuned on one clip, scored `shallow` 11 / 11 with no false alarms; all 3
+  `hip_sag` false alarms were also theirs.
+
+With 36 reps from 4 clips, one clip's quirk moves a whole row of this table. These numbers say
+the method works on unseen video of these two people for pike, mostly for depth and sag, and
+are untested for lockout.
+
+### Training clips, for comparison
+
+94 reps from 12 clips. Tuned on these, and three labels were corrected during tuning, so these
+are optimistic by construction.
+
+| Fault | Precision | Recall |
+| --- | --- | --- |
+| `shallow` | 0.97 | 1.00 |
+| `hip_sag` | 1.00 | 0.91 |
+| `hip_pike` | 1.00 | 1.00 |
+| `no_lockout` | 1.00 | 1.00 |
 
 ## Limitations
 

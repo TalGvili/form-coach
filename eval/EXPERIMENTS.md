@@ -307,3 +307,86 @@ in no. 8 and clip06 rep 7 in no. 10). Each was re-watched against the written ru
 had been marked borderline when labelling. All three moved toward the detector, so the
 training numbers above are somewhat optimistic. The held-out labels are never revisited; their
 results are the honest measure.
+
+**Suppression, decided before the held-out run:** kept. On the training clips it hides 6
+correct shallow detections and prevents 1 false alarm, so it no longer pays for itself in the
+numbers; it stays on the coaching argument (fix the hips first, one cue at a time).
+
+## Training results after tuning (2026-10-03)
+
+94 reps from 12 clips (clip08 and clip13 miscounted). Includes the three relabels.
+
+| Fault | Detected | Missed | False alarms | Precision | Recall | Not evaluated |
+| --- | --- | --- | --- | --- | --- | --- |
+| shallow | 36 / 36 | 0 | 1 (0 in the feedback) | 0.97 | 1.00 | 8 |
+| hip_sag | 20 / 22 | 2 | 0 | 1.00 | 0.91 | 0 |
+| hip_pike | 17 / 17 | 0 | 0 | 1.00 | 1.00 | 3 |
+| no_lockout | 14 / 14 | 0 | 0 | 1.00 | 1.00 | 22 |
+
+Against the baseline (no. 7): false alarms 27 → 1, misses 5 → 2.
+
+## 12. Held-out run (2026-10-03)
+
+Run once, with the config and labels at commit 3d5423a (SHA-256 of `configs/pushup.yaml`
+starts 333CA68A, of `data/labels.csv` 15747EEB). Nothing is tuned after this.
+
+**Counting: 4 of 6 clips correct.** clip12 found 0 reps (5 labelled), clip15 found 10 (8
+labelled); both are left out of the per-rep scoring. **36 reps from 4 clips scored.**
+
+| Fault | Detected | Missed | False alarms | Precision | Recall |
+| --- | --- | --- | --- | --- | --- |
+| shallow | 11 / 11 | 0 | 8 (5 in the feedback) | 0.58 | 1.00 |
+| hip_sag | 8 / 8 | 0 | 3 | 0.73 | 1.00 |
+| hip_pike | 8 / 8 | 0 | 0 | 1.00 | 1.00 |
+| no_lockout | – | – | – | – | – |
+
+Per person: person B (clip18, clip20) — shallow 11 / 11 with no false alarms, sag 3 false
+alarms, clip20 (clean) perfect. Person A (clip10, clip17) — sag 8 / 8, pike 8 / 8, shallow 8
+false alarms.
+
+**Why each error happened** (read from the run, not tuned):
+
+- **clip12, no reps found.** Filmed slightly off-angle, the upper arm's range over the whole
+  clip is 9.3°, under the 10° floor from no. 6, so the clip was treated as "no movement". The
+  floor came from training clips, whose smallest real range was 15°; none was off-angle. An
+  angled view compresses the arm's movement on screen.
+- **clip15, 10 reps for 8.** Mirrored, no-lockout set, whose tops read 40–60° (the arms never
+  straighten). Two dips are not reps:
+  - 15.3 s, the last: the only movement that climbs to 86°, straight arms, twice a typical rep.
+    Getting up off the floor after the set; the README limitation "collapsing flat onto the
+    floor and then pushing up looks exactly like a rep" (Tal's guess when re-watching).
+  - 11.7 s: a "bottom" at 43° (real bottoms here: 3–29°) that climbs back only 0.52 of a typical
+    rep, just over the 0.45 cutoff for a completed rep (no. 4). A hesitation between two reps.
+
+  With clip15 left out, `no_lockout` has **no held-out result at all**: it was its only
+  held-out clip.
+- **clip10, 5 shallow false alarms.** The held-out sag clip: full-depth reps read 15.8–20.6°.
+  The README named this risk when the split was chosen: clip10 holds 8 of the 12 isolated sag
+  reps, so depth was tuned on only 4 full-depth sag reps. Sagging changes how the upper arm sits
+  at the bottom.
+- **clip17, 3 shallow false alarms.** A pike clip reading 26–49°: the piked-depth limitation in
+  the README. Suppression hides all three from the user.
+- **clip18, 3 sag false alarms.** 13.5–15.3° for 0.23–0.33 s, just past the 13° / 0.2 s set in
+  no. 9. The drop grows over the set (0.2° on rep 1, 15.3° on rep 8), possibly a mild sag
+  developing with fatigue. No. 9 warned that its gain came mostly from clip04.
+
+**What it says.** Nothing labelled was missed: every error is a false alarm or a counting
+failure. The faults that held up are the ones measured from big, clear geometry (pike). The
+weakest, shallow, is an angle in a 2D side view: posture (sag, pike, elbow flare) and camera
+angle change how the upper arm projects, and the held-out clips contained postures the tuning
+barely saw. Training and held-out numbers differ by about as much as the relabels and the
+clip04-driven sag change would suggest.
+
+**Considered after the run, not adopted: hip_sag suppressing shallow,** as hip_pike does, since
+clip10's false alarms are full-depth reps with sagging hips. Two reasons against. Adopting a
+change because of a held-out clip and then reporting that clip's numbers would make it training
+data; any such change needs new unseen clips to be measured. And on the training clips it does
+real damage, because there sagging and shallow mostly come together:
+
+| shallow, in the feedback (training clips) | Detected | Missed | Recall |
+| --- | --- | --- | --- |
+| Pike suppresses shallow (current) | 30 / 36 | 6 | 0.83 |
+| Pike and sag suppress shallow | 12 / 36 | 24 | 0.33 |
+
+What would actually help is more footage of full-depth sagging reps, the combination the
+training set barely contains.

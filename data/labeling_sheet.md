@@ -126,7 +126,7 @@ Two people perform in the dataset: person A in clip01–clip17, person B in clip
 | clip14 | 4 | 0 | 0 | 0 | 0 | Bad lighting |
 | clip14 | 5 | 0 | 0 | 0 | 0 | At the beginning of rep 0.5 sec of hip sag,Bad lighting |
 | clip14 | 6 | 0 | 0 | 0 | 0 | Bad lighting |
-| clip14 | 7 | 0 | 1 | 0 | 0 | Bad lighting,maybe shallow |
+| clip14 | 7 | 1 | 1 | 0 | 0 | Bad lighting,shallow on re-watch (was "maybe shallow") |
 | clip14 | 8 | 0 | 0 | 0 | 0 | Bad lighting |
 | clip15 | 1 | 0 | 0 | 0 | 1 | Mirrored |
 | clip15 | 2 | 0 | 0 | 0 | 1 | Mirrored |

@@ -45,7 +45,7 @@ and regenerated after every relabel, so the two never drift apart.
 
 | Label | Reps | Clips |
 | --- | --- | --- |
-| `shallow` | 50 | 7 |
+| `shallow` | 51 | 8 |
 | `hip_sag` | 33 | 6 |
 | `hip_pike` | 26 | 5 |
 | `no_lockout` | 25 | 5 |
@@ -81,10 +81,10 @@ that happen to occur together. Reps carrying exactly one fault:
 | --- | --- |
 | `no_lockout` | 25 / 25 |
 | `hip_pike` | 19 / 26 |
-| `shallow` | 23 / 50 |
-| `hip_sag` | 13 / 33 |
+| `shallow` | 23 / 51 |
+| `hip_sag` | 12 / 33 |
 
-`hip_sag` is the weakest here: 20 of its 33 reps also carry `shallow`, so only 13 reps across 3
+`hip_sag` is the weakest here: 21 of its 33 reps also carry `shallow`, so only 12 reps across 2
 clips show sag with depth otherwise correct. This is the known soft spot in the dataset.
 
 ### Held-out evaluation set
@@ -98,7 +98,7 @@ Six clips are held out and were chosen before any detection code was written:
 tuned on the other 14 clips only; the final evaluation table is reported on these six, so the
 numbers describe performance on video that was never used for tuning.
 
-One cost is worth stating: clip10 holds 8 of the 13 isolated `hip_sag` reps, leaving 5 for
+One cost is worth stating: clip10 holds 8 of the 12 isolated `hip_sag` reps, leaving 4 for
 tuning. A test set with only one sag rep would have been worse.
 
 Person B's clips split as one for tuning (clip19) and two held out (clip18, clip20), so the

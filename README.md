@@ -47,9 +47,9 @@ and regenerated after every relabel, so the two never drift apart.
 | --- | --- | --- |
 | `shallow` | 51 | 8 |
 | `hip_sag` | 33 | 6 |
-| `hip_pike` | 26 | 5 |
+| `hip_pike` | 27 | 5 |
 | `no_lockout` | 26 | 5 |
-| clean (no fault) | 50 | 10 |
+| clean (no fault) | 49 | 10 |
 
 A rep can carry more than one fault, so the fault counts overlap and do not sum to 158. The
 clip count matters as much as the rep count: reps within one clip share lighting, camera
@@ -71,6 +71,11 @@ from the labels; there are 3 in this dataset.
 
 Borderline reps are labeled using the rule anyway, with a note in the `notes` column.
 
+During tuning, three training labels were changed after re-watching the rep against the
+written rule (clip14 rep 7, clip06 reps 5 and 7); each change and its reason is in
+`eval/EXPERIMENTS.md`. All three moved toward the detector, so the training numbers are
+somewhat optimistic. Held-out labels were never revisited.
+
 ### Fault isolation
 
 Faults were also filmed on their own — piking and sagging with full depth, shallow reps with a
@@ -80,7 +85,7 @@ that happen to occur together. Reps carrying exactly one fault:
 | Fault | Isolated reps |
 | --- | --- |
 | `no_lockout` | 26 / 26 |
-| `hip_pike` | 19 / 26 |
+| `hip_pike` | 20 / 27 |
 | `shallow` | 23 / 51 |
 | `hip_sag` | 12 / 33 |
 

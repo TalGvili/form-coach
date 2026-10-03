@@ -65,7 +65,7 @@ Two people perform in the dataset: person A in clip01–clip17, person B in clip
 | clip06 | 2 | 0 | 0 | 1 | 0 |  |
 | clip06 | 3 | 0 | 0 | 1 | 0 |  |
 | clip06 | 4 | 0 | 0 | 1 | 0 |  |
-| clip06 | 5 | 0 | 0 | 0 | 0 | On the border with hip pike |
+| clip06 | 5 | 0 | 0 | 1 | 0 | On the border with hip pike; relabelled pike 2026-10-03 on review |
 | clip06 | 6 | 0 | 0 | 0 | 1 | Relabelled 2026-09-27 on review: arms stop short of straight |
 | clip06 | 7 | 0 | 0 | 0 | 1 | Relabelled 2026-10-03 on review: a small bend, like rep 6 |
 | clip06 | 8 | 0 | 0 | 0 | 0 |  |

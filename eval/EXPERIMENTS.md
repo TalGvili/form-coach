@@ -230,3 +230,33 @@ so the held-out set may show less. And the overlap at 12.5° points to a per-cli
 clips read 10–12° below the line on every rep (clip16 for sag; clip06 does the same for pike).
 Measuring each rep's hip relative to the person's own plank could remove it; a separate
 experiment.
+
+## 10. No lockout: one relabel, threshold 156° (2026-10-03)
+
+**Problem:** 4 false alarms at the starting minimum of 160°, 3 of them in clip01. The two
+groups touched: labelled no-lockout reps read up to 155.0°, the most bent locked-out rep
+155.4° (clip06 rep 7).
+
+**Looking at the boundary.** The top of four reps, drawn with a line continuing the upper arm
+straight: clip07 rep 7 (no lockout, 155.0°), clip06 rep 6 (no lockout, 153.4°), clip06 rep 7
+(locked, 155.4°), clip01 rep 2 (locked, 157.5°). All four show a slight bend of about the same
+size; even reps labelled locked out read 155–158°, not 175–180°. Re-watched, clip06 rep 7 is
+no lockout, by a small amount, like rep 6 next to it, and is relabelled. `no_lockout` is now
+26 reps.
+
+**After the relabel** the groups separate: no lockout up to 155.4°, locked out from 157.5°.
+
+| Minimum | False alarms | Missed |
+| --- | --- | --- |
+| 160 (start) | 3 | 0 |
+| 158 | 1 | 0 |
+| **156** | **0** | **0** |
+| 155 | 0 | 2 |
+
+**Decision: 156°.** The middle of the 2.1° gap is 156.4°; 156 nudges it toward missing, by
+the rule from no. 8. Room: 1.5° before the nearest locked-out rep is flagged, 0.6° before a
+no-lockout rep is missed. 14 of 14 detected, no false alarms. The gap is narrow and set by
+borderline reps, so the held-out set may cost a miss or a false alarm.
+
+**Not evaluated:** lockout can't be checked on 22 of the 94 scored reps (clips 03, 04, 05,
+wrists outside the frame). No threshold changes that.

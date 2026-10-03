@@ -97,7 +97,8 @@ rules:
   no_lockout:
     title: "Arm lockout"
     metric: max_elbow_angle
-    # 180 deg = straight arm. The labelling rule ignores slight softness in the elbows.
-    # Clean reps seen as low as 158.5 deg (clip01 rep 1), so 160 may be tight.
-    min: 160
+    # 180 deg = straight arm, but reps labelled locked out read from 157.5 deg: the labelling
+    # rule ignores slight softness in the elbows. No-lockout reps read up to 155.4. 156 sits
+    # in that gap, nudged toward missing, as for shallow. EXPERIMENTS.md, no. 10.
+    min: 156
     message: "Straighten your arms fully at the top"

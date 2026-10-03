@@ -49,7 +49,8 @@ segmentation:
   # sags added pike false alarms (EXPERIMENTS.md, no. 9).
   # Sag: the smallest labelled sags drop 12.5-15.4 deg; clean reps peak at 12.6 (clip16).
   sag_threshold_deg: &sag_threshold 13
-  pike_threshold_deg: &pike_threshold 15
+  # Pike: labelled pikes rise from 32.7 deg (an inverted V); clean reps peak at 28.5.
+  pike_threshold_deg: &pike_threshold 30
 
 # Fault rules (pipeline/rules.py). Each rule reads one Rep field (metric) and flags the rep
 # when the value is above max or below min. A NaN metric (a landmark outside the frame) is
@@ -91,6 +92,9 @@ rules:
     metric: max_hip_rise
     max: *pike_threshold  # degrees above the shoulder-ankle line
     duration_metric: hip_pike_duration_s
+    # 30 deg for 0.3 s: the labelling rule's "inverted V" is a big rise; 15 deg flagged 4
+    # clean reps. 28-30 all score 17 of 17 with no false alarms; 30 is the end that leans
+    # toward missing. EXPERIMENTS.md, no. 11.
     min_duration_s: 0.3
     message: "Hips too high: lower them into a straight line"
 

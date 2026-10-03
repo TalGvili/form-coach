@@ -260,3 +260,50 @@ borderline reps, so the held-out set may cost a miss or a false alarm.
 
 **Not evaluated:** lockout can't be checked on 22 of the 94 scored reps (clips 03, 04, 05,
 wrists outside the frame). No threshold changes that.
+
+## 11. Hip pike: one relabel, threshold 30° (2026-10-03)
+
+**Problem:** 5 false alarms at 15°. Labelled pikes rise far more than that: the smallest
+reaches 35.3°, while clean reps peaked at 32.7° (clip06 rep 5), then 28.5, 23.0, 21.9,
+20.4°. The labelling rule describes an inverted V, a big rise; 15° was simply too low.
+
+**Raising it, with the old labels:**
+
+| Threshold | Min. duration | Caught (of 16) | Missed | False alarms |
+| --- | --- | --- | --- | --- |
+| 15 | 0.3 s | 16 | 0 | 5 |
+| 25 | 0.3 s | 16 | 0 | 2 |
+| 30 | 0.3 s | 16 | 0 | 1 |
+| 33 | 0.3 s | 15 | 1 | 0 |
+| 34 | 0.3 s | 14 | 2 | 0 |
+
+The misses at 33–34° are not small pikes but short ones: the duration is measured at the
+threshold, and clip06 rep 4 (35.3°) is above 33° for only 0.13 s. Both errors at the boundary
+were neighbours in clip06, the clip whose hip reads high on every rep: rep 4 (pike) and rep 5
+(clean, 32.7°, noted "On the border with hip pike" when labelling). Re-watched, rep 5 is a pike
+and is relabelled. `hip_pike` is now 27 reps.
+
+**After the relabel:**
+
+| Threshold | Min. duration | Caught (of 17) | Missed | False alarms |
+| --- | --- | --- | --- | --- |
+| 15 | 0.3 s | 17 | 0 | 4 |
+| 28, 29, **30** | 0.3 s | **17** | **0** | **0** |
+| 31, 32 | 0.3 s | 16 | 1 | 0 |
+
+**Decision: 30° for 0.3 s**, the end of the working range that leans toward missing. Room:
+1.5° above the highest clean rep (clip09 rep 7, 28.5°). On the pike side it is thin: clip06
+rep 5 stays above 30° for 0.33 s, just over the minimum.
+
+Rejected: measuring the duration at a lower level than the peak ("peaks above 33°, above 25°
+for 0.3 s"). It adds a setting, breaks the one-number-per-rule link from no. 9, and would be
+fitted to two reps in one clip.
+
+Side effect: with fewer pike faults, suppression hides one fewer correct shallow detection
+(feedback misses 7 → 6).
+
+**On the relabels.** This is the third training label changed during tuning (with clip14 rep 7
+in no. 8 and clip06 rep 7 in no. 10). Each was re-watched against the written rule, and two
+had been marked borderline when labelling. All three moved toward the detector, so the
+training numbers above are somewhat optimistic. The held-out labels are never revisited; their
+results are the honest measure.

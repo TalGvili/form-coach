@@ -11,10 +11,10 @@ import numpy as np
 import pytest
 
 from pipeline import signals
+from pipeline.errors import NoPersonError, SingleRepError
 from pipeline.models import VideoInfo
 from pipeline.reps import (
     RepConfig,
-    SingleRepError,
     find_rep_bottoms,
     load_config,
     segment_reps,
@@ -24,6 +24,7 @@ FPS = 30.0
 PERIOD = int(2 * FPS)  # one push-up every two seconds
 INFO = VideoInfo(path="synthetic", fps=FPS, width=1920, height=1080, n_frames=0)
 CFG = RepConfig(
+    min_detected_fraction=0.5,
     max_tilt_deg=35,
     max_gap_frames=5,
     smoothing_window_s=0.4,
@@ -154,6 +155,35 @@ def test_a_single_rep_is_refused_rather_than_guessed():
     is unknown."""
     with pytest.raises(SingleRepError):
         segment_reps(synthetic_clip([0.0]), INFO, CFG)
+
+
+def test_a_video_mostly_without_a_person_is_refused():
+    landmarks = synthetic_clip([0.0] * 4)
+    landmarks[: int(len(landmarks) * 0.6)] = np.nan  # nobody detected in 60% of the frames
+    with pytest.raises(NoPersonError):
+        segment_reps(landmarks, INFO, CFG)
+
+
+def test_a_video_with_no_frames_is_refused():
+    with pytest.raises(NoPersonError):
+        segment_reps(np.empty((0, 33, 4)), INFO, CFG)
+
+
+def test_arm_movement_while_standing_is_not_counted_as_reps():
+    """Nobody gets into a plank, so there is nothing to search: swinging the arms while
+    standing makes dips in the upper-arm angle just like push-ups do."""
+    t = np.arange(4 * PERIOD)
+    landmarks = np.full((t.size, 33, 4), np.nan)
+    landmarks[:, signals.RIGHT.indices, 3] = 0.2
+    for index, xy in STANDING.items():
+        landmarks[:, index, :2] = xy
+        landmarks[:, index, 3] = 1.0
+    # the upper arm swings 45 degrees forward and back every two seconds
+    swing = np.radians(45 * (1 - np.cos(2 * np.pi * t / PERIOD)) / 2)
+    shoulder = STANDING[L.shoulder]
+    landmarks[:, L.elbow, 0] = shoulder[0] + 150 * np.sin(swing)
+    landmarks[:, L.elbow, 1] = shoulder[1] + 150 * np.cos(swing)
+    assert segment_reps(landmarks, INFO, CFG) == []
 
 
 def test_each_metric_records_the_moment_it_came_from():

@@ -25,8 +25,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from pipeline.errors import SingleRepError
 from pipeline.models import SessionResult
-from pipeline.reps import SingleRepError
 from pipeline.rules import load_rules
 from pipeline.session import analyze
 

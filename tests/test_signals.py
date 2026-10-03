@@ -174,8 +174,9 @@ class TestInPositionWindow:
         tilt = np.concatenate([np.full(10, np.nan), np.full(30, 5.0)])
         assert signals.in_position_window(tilt, max_tilt_deg=35.0) == (10, 40)
 
-    def test_no_horizontal_frames_returns_whole_range(self):
-        assert signals.in_position_window(np.full(50, 80.0), max_tilt_deg=35.0) == (0, 50)
+    def test_no_horizontal_frames_returns_an_empty_window(self):
+        # standing the whole time: there is no push-up to search, not the whole clip
+        assert signals.in_position_window(np.full(50, 80.0), max_tilt_deg=35.0) == (0, 0)
 
 
 class TestInterpolateGaps:

@@ -19,6 +19,7 @@ import yaml
 from scipy.signal import find_peaks
 
 from pipeline import signals
+from pipeline.errors import AnalysisError, NoPersonError, SingleRepError
 from pipeline.landmarks import load_or_extract
 from pipeline.models import Rep, VideoInfo
 
@@ -27,6 +28,7 @@ from pipeline.models import Rep, VideoInfo
 class RepConfig:
     """Segmentation settings: the `segmentation` section of the config file."""
 
+    min_detected_fraction: float
     max_tilt_deg: float
     max_gap_frames: int
     smoothing_window_s: float
@@ -93,11 +95,6 @@ def find_rep_bottoms(
         distance=max(1, int(fps * min_rep_spacing_s)),
     )
     return bottoms
-
-
-class SingleRepError(ValueError):
-    """The clip holds one rep, whose start and end cannot be told apart from getting down
-    and getting up. Raised rather than guessed; the caller tells the user to film more."""
 
 
 def rep_windows(
@@ -261,6 +258,11 @@ def measure_rep(
 
 def segment_reps(landmarks: np.ndarray, info: VideoInfo, cfg: RepConfig) -> list[Rep]:
     """Find and measure every completed rep in one clip. Reps are numbered from 1."""
+    detected = ~np.isnan(landmarks).all(axis=(1, 2))  # frames with a person in them
+    if detected.size == 0 or detected.mean() < cfg.min_detected_fraction:
+        raise NoPersonError(
+            "Couldn't find a person in the video. Check that your whole body is in the frame."
+        )
     side = signals.pick_side(landmarks)
     tilt = signals.torso_tilt_series(landmarks, side)
     start, stop = signals.in_position_window(tilt, cfg.max_tilt_deg)
@@ -299,7 +301,7 @@ def main(argv: list[str]) -> int:
     info, landmarks = load_or_extract(argv[0])
     try:
         reps = segment_reps(landmarks, info, load_config(config))
-    except SingleRepError as error:
+    except AnalysisError as error:
         print(f"{info.path}: {error}", file=sys.stderr)
         return 1
     print(f"{info.path}: {len(reps)} reps")

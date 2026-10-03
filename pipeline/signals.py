@@ -141,12 +141,15 @@ def in_position_window(tilt: np.ndarray, max_tilt_deg: float) -> tuple[int, int]
     getting up. While standing, the upper-arm angle sits mid-range, so peak finding can
     count the setup as a rep. Taking the longest run rather than every qualifying frame
     stops a stray horizontal moment during setup from reopening the window.
+
+    With no horizontal frame at all the window is empty, (0, 0): nobody got into a push-up
+    position, so there is nothing to search for reps.
     """
     # unknown tilt counts as standing, so frames without data are excluded
     horizontal = np.nan_to_num(tilt, nan=90.0) < max_tilt_deg
     stretches = runs(horizontal)
     if not stretches:
-        return 0, len(tilt)
+        return 0, 0
     return max(stretches, key=lambda run: run[1] - run[0])
 
 

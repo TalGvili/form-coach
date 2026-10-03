@@ -4,6 +4,11 @@ exercise: pushup
 
 # How reps are found and measured (pipeline/reps.py).
 segmentation:
+  # A video where a person is detected in fewer frames than this share is refused (no person).
+  # Every training clip measured 100%, standing and walking in included. Half the frames is
+  # far from that and still means the video is mostly not of a person.
+  min_detected_fraction: 0.5
+
   # A shoulder-ankle line steeper than this is standing or kneeling, not a push-up.
   # Push-ups measured 0-10 deg; standing ~85 deg.
   max_tilt_deg: 35

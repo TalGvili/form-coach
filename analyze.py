@@ -11,9 +11,9 @@ import json
 import sys
 from pathlib import Path
 
+from pipeline.errors import AnalysisError
 from pipeline.models import SessionResult
 from pipeline.render import render
-from pipeline.reps import SingleRepError
 from pipeline.rules import load_rules
 from pipeline.session import analyze, to_json
 
@@ -59,7 +59,7 @@ def main(argv: list[str]) -> int:
 
     try:
         result = analyze(args.video, args.config)
-    except SingleRepError as error:
+    except AnalysisError as error:
         print(f"{args.video}: {error}", file=sys.stderr)
         return 1
 

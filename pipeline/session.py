@@ -1,8 +1,8 @@
 """From a video file to a SessionResult: the pipeline stages in order, and nothing else.
 
 Both entry points call analyze(): analyze.py on the command line, and the web app later.
-It returns data and lets errors propagate (a missing file, SingleRepError); printing,
-saving, and turning errors into messages or HTTP responses is each caller's job.
+It returns data and lets errors propagate (a missing file, a pipeline.errors.AnalysisError);
+printing, saving, and turning errors into messages or HTTP responses is each caller's job.
 """
 
 import dataclasses

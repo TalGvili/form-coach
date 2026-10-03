@@ -58,10 +58,12 @@ rules:
   shallow:
     title: "Depth"
     metric: min_upper_arm_angle
-    # 0 deg = upper arm parallel to the floor, the labelling rule's line. 5 deg of slack for
-    # landmark noise. Likely too tight: clean reps in clip16 read 6.5 and 6.8 deg, and
-    # smoothing lifts narrow dips. Tune together with smoothing_window_s.
-    max: 5
+    # 0 deg = upper arm parallel to the floor, the labelling rule's line. Real side views
+    # aren't perfect: at the bottom the elbows flare toward the camera, the upper arm is seen
+    # partly end-on, and full-depth reps read up to 13.8 deg. Shallow reps read from 16.1.
+    # 15 sits in that gap, slightly toward the shallow side: a missed shallow rep is better
+    # than telling someone a good rep wasn't deep enough. EXPERIMENTS.md, no. 8.
+    max: 15
     # Hips first: on a piked rep, "hips too high" is the cue, and depth reads as shallow
     # when it isn't (the upper arm is seen end-on). Not for hip_sag: depth on sagging reps
     # is measured well, and 20 of 33 sag reps really are shallow too.

@@ -3,6 +3,7 @@
     python -m eval.evaluate              # the training clips: tune against these
     python -m eval.evaluate --held-out   # the held-out clips: run once, when tuning is done
     python -m eval.evaluate --by-clip    # also break each fault down per clip
+    python -m eval.evaluate --config x.yaml   # score a variant config against the same labels
 
 Each (rep, rule) pair has one of three outcomes: fault, ok, or could not evaluate (a metric
 was NaN because a landmark was outside the frame). Could-not-evaluate is counted on its own
@@ -112,9 +113,10 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--held-out", action="store_true", help="evaluate the held-out clips")
     parser.add_argument("--by-clip", action="store_true", help="also show each clip")
+    parser.add_argument("--config", type=Path, default=CONFIG, help="try a variant config")
     args = parser.parse_args(argv)
 
-    rules = [rule.name for rule in load_rules(CONFIG)]
+    rules = [rule.name for rule in load_rules(args.config)]
     labels = pd.read_csv(LABELS)
     missing = set(rules) - set(labels.columns)
     if missing:
@@ -126,7 +128,7 @@ def main(argv: list[str]) -> int:
     for clip in clips:
         labelled = int((labels["clip"] == clip).sum())
         try:
-            result = analyze(VIDEOS / f"{clip}.mp4", CONFIG)
+            result = analyze(VIDEOS / f"{clip}.mp4", args.config)
         except SingleRepError:
             failures.append(f"{clip}: 1 rep found, {labelled} labelled")
             continue

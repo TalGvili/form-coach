@@ -55,6 +55,7 @@ class ClipSignals:
     """
 
     depth: np.ndarray  # upper-arm angle: 0 = parallel to the floor
+    depth_raw: np.ndarray  # the same, gap-filled but not smoothed: for reading the bottom
     elbow: np.ndarray  # elbow angle: 180 = straight arm
     hip: np.ndarray  # hip deviation: + below the body line, - above it
     depth_seen: np.ndarray
@@ -161,17 +162,24 @@ def clip_signals(
     Frames outside the in-position window are blanked to NaN first. smooth() works on each
     run of valid frames separately, so the push-ups are smoothed on their own. Smoothed
     across the edge, the jump to standing makes the fitted curve overshoot and invent a dip.
+
+    Depth is also kept unsmoothed: smoothing finds the bottom reliably but rounds off its
+    tip, reading a narrow dip several degrees too high.
     """
     start, stop = window
 
-    def prepare(series: np.ndarray) -> np.ndarray:
+    def fill(series: np.ndarray) -> np.ndarray:
         inside = np.full_like(series, np.nan)
         inside[start:stop] = series[start:stop]
-        filled = signals.interpolate_gaps(inside, cfg.max_gap_frames)
-        return signals.smooth(filled, info.fps, cfg.smoothing_window_s)
+        return signals.interpolate_gaps(inside, cfg.max_gap_frames)
 
+    def prepare(series: np.ndarray) -> np.ndarray:
+        return signals.smooth(fill(series), info.fps, cfg.smoothing_window_s)
+
+    upper_arm = signals.upper_arm_angle_series(landmarks, side)
     return ClipSignals(
-        depth=prepare(signals.upper_arm_angle_series(landmarks, side)),
+        depth=prepare(upper_arm),
+        depth_raw=fill(upper_arm),
         elbow=prepare(signals.elbow_angle_series(landmarks, side)),
         hip=prepare(signals.hip_deviation_series(landmarks, side)),
         depth_seen=_in_frame(landmarks, [side.shoulder, side.elbow], info),
@@ -235,8 +243,9 @@ def measure_rep(
         bottom_frame=bottom,
         end_frame=last,
         min_elbow_angle=_seen_or_nan(low_elbow, low_elbow_at, s.elbow_seen),
-        # the bottom is where depth is lowest, so the two can never disagree
-        min_upper_arm_angle=_seen_or_nan(float(s.depth[bottom]), bottom, s.depth_seen),
+        # Found on the smoothed signal, read from the raw one: smoothing rounds off the tip
+        # of a narrow dip (clip16 rep 1: raw 2.3 deg, smoothed 6.5). EXPERIMENTS.md, no. 8.
+        min_upper_arm_angle=_seen_or_nan(float(s.depth_raw[bottom]), bottom, s.depth_seen),
         max_elbow_angle=_seen_or_nan(high_elbow, high_elbow_at, s.elbow_seen),
         max_hip_drop=max_hip_drop,
         max_hip_rise=max_hip_rise,

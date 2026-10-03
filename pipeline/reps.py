@@ -35,7 +35,8 @@ class RepConfig:
     min_range_deg: float
     min_return_fraction: float
     hip_moving_fraction: float
-    hip_duration_threshold_deg: float
+    sag_threshold_deg: float
+    pike_threshold_deg: float
 
 
 def load_config(path: Path) -> RepConfig:
@@ -233,9 +234,8 @@ def measure_rep(
 
     max_hip_drop = _seen_or_nan(max(drop, 0.0), drop_at, s.hip_seen)
     max_hip_rise = _seen_or_nan(max(-rise, 0.0), rise_at, s.hip_seen)
-    threshold = cfg.hip_duration_threshold_deg
-    sag_s = _longest_run_s(hip[whole] > threshold, fps)
-    pike_s = _longest_run_s(hip[whole] < -threshold, fps)
+    sag_s = _longest_run_s(hip[whole] > cfg.sag_threshold_deg, fps)
+    pike_s = _longest_run_s(hip[whole] < -cfg.pike_threshold_deg, fps)
 
     return Rep(
         index=index,

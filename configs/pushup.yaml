@@ -42,16 +42,20 @@ segmentation:
   # 0.8 starts losing real sags.
   hip_moving_fraction: 0.9
 
-  # Hip sag / pike durations count the time the hip spends beyond this many degrees off the
-  # body line. The hip rules below must use the same number, so it is defined once here
-  # (&hip_threshold) and reused there (*hip_threshold).
-  hip_duration_threshold_deg: &hip_threshold 15
+  # Sag / pike durations count the time the hip spends beyond these many degrees below /
+  # above the body line. Each hip rule must use its own number, so each is defined once here
+  # (&sag_threshold, &pike_threshold) and reused by its rule below (*sag_threshold, ...).
+  # Separate because they are different faults: lowering one shared value to catch small
+  # sags added pike false alarms (EXPERIMENTS.md, no. 9).
+  # Sag: the smallest labelled sags drop 12.5-15.4 deg; clean reps peak at 12.6 (clip16).
+  sag_threshold_deg: &sag_threshold 13
+  pike_threshold_deg: &pike_threshold 15
 
 # Fault rules (pipeline/rules.py). Each rule reads one Rep field (metric) and flags the rep
 # when the value is above max or below min. A NaN metric (a landmark outside the frame) is
 # "could not evaluate", never "no fault". Rule names match the columns of data/labels.csv,
 # so Phase 5 compares predictions with labels without a mapping table.
-# The values are starting guesses; Phase 5 replaces them with measured choices.
+# Values started as guesses; the ones tuned in Phase 5 point to their EXPERIMENTS.md entry.
 # title names the check to a user; message tells them what to fix. Both are drawn on the
 # annotated video, whose fonts only have ASCII: no dashes or quotes beyond the keyboard ones.
 rules:
@@ -66,24 +70,26 @@ rules:
     max: 15
     # Hips first: on a piked rep, "hips too high" is the cue, and depth reads as shallow
     # when it isn't (the upper arm is seen end-on). Not for hip_sag: depth on sagging reps
-    # is measured well, and 20 of 33 sag reps really are shallow too.
+    # is measured well, and 21 of 33 sag reps really are shallow too.
     suppressed_by: [hip_pike]
     message: "Not reaching full depth"
 
   hip_sag:
     title: "Hip sag"
     metric: max_hip_drop
-    max: *hip_threshold  # degrees below the shoulder-ankle line
+    max: *sag_threshold  # degrees below the shoulder-ankle line
     duration_metric: hip_sag_duration_s
     # A brief dip is noise or a wobble; the labelling rule says "a noticeable part of the
-    # rep". May miss clip04, whose sags are often shorter than this.
-    min_duration_s: 0.3
+    # rep". 13 deg for 0.2 s catches 20 of 22 sags with no false alarms; the 2 missed (clip05
+    # reps 6-7, 12.5 deg) are as small as clean reps get, so catching them costs a false
+    # alarm. EXPERIMENTS.md, no. 9.
+    min_duration_s: 0.2
     message: "Hips dropping: engage your core"
 
   hip_pike:
     title: "Hip pike"
     metric: max_hip_rise
-    max: *hip_threshold  # degrees above the shoulder-ankle line
+    max: *pike_threshold  # degrees above the shoulder-ankle line
     duration_metric: hip_pike_duration_s
     min_duration_s: 0.3
     message: "Hips too high: lower them into a straight line"

@@ -32,7 +32,8 @@ CFG = RepConfig(
     min_range_deg=10,
     min_return_fraction=0.45,
     hip_moving_fraction=0.9,
-    hip_duration_threshold_deg=15,
+    sag_threshold_deg=15,
+    pike_threshold_deg=15,
 )
 L = signals.LEFT
 STANDING = {
@@ -191,7 +192,7 @@ def test_lockout_is_judged_at_the_top_the_rep_rises_to():
 def test_a_sagging_rep_has_a_positive_drop_and_a_duration():
     reps = segment_reps(synthetic_clip([0.0] * 5, sags=[0, 0, 80, 0, 0]), INFO, CFG)
     sagging = reps[2]
-    assert sagging.max_hip_drop > CFG.hip_duration_threshold_deg
+    assert sagging.max_hip_drop > CFG.sag_threshold_deg
     assert 0.5 < sagging.hip_sag_duration_s < 1.1
     assert sagging.max_hip_rise == pytest.approx(0, abs=1)
     for rep in reps[:2] + reps[3:]:
@@ -214,7 +215,7 @@ def test_a_piking_rep_has_a_positive_rise_and_a_duration():
     """The pike mirror of the sag test: a negative sag raises the hip above the body line."""
     reps = segment_reps(synthetic_clip([0.0] * 5, sags=[0, -80, 0, 0, 0]), INFO, CFG)
     piking = reps[1]
-    assert piking.max_hip_rise > CFG.hip_duration_threshold_deg
+    assert piking.max_hip_rise > CFG.pike_threshold_deg
     assert 0.5 < piking.hip_pike_duration_s < 1.1
     assert piking.max_hip_drop == pytest.approx(0, abs=1)
     for rep in reps[:1] + reps[2:]:

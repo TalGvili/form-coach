@@ -187,3 +187,46 @@ of the gap, tilted toward missing: 1.2° of room before a clean rep is flagged (
 1.1° before a shallow rep is missed. The one remaining detector false alarm is a piked rep
 (clip11 rep 3), which suppression hides from the feedback. Fixed before running the held-out
 clips, and not to be changed after.
+
+## 9. Hip sag: separate thresholds, 13° for 0.2 s (2026-10-03)
+
+**Problem:** 5 labelled sags missed, all in clip04 (reps 6–8) and clip05 (reps 6–7). The
+duration rule was not the main cause: these sags barely reach 15° at all.
+
+| | Hip drop |
+| --- | --- |
+| Missed sags | 12.5, 12.6, 13.7, 15.1 (for 0.03 s), 15.4° (for 0.07 s) |
+| Caught sags | from 17.2° |
+| Clean reps, highest | 12.6° (clip16 rep 2), then 11.6, 11.6, 11.4 |
+
+**First try:** lower the shared hip threshold. Sag improved, but pike false alarms rose from
+5 to 7–12: sag and pike shared one number (`hip_duration_threshold_deg`), because the
+durations were measured at a single threshold.
+
+**Change:** separate `sag_threshold_deg` and `pike_threshold_deg`, each defined once and
+anchored to its own rule. Pike stays at 15° / 0.3 s and its numbers don't move in any
+variant below.
+
+| Sag threshold | Min. duration | Caught (of 22) | Missed | False alarms |
+| --- | --- | --- | --- | --- |
+| 15° | 0.3 s | 17 | 5 | 0 |
+| 14° | 0.2 s | 18 | 4 | 0 |
+| 13° | 0.3 s | 19 | 3 | 0 |
+| **13°** | **0.2 s** | **20** | **2** | **0** |
+| 12° | 0.2 s | 21 | 1 | 1 |
+| 12° | 0.15 s | 22 | 0 | 1 |
+
+The duration rule is what lets the threshold drop: clean clip16 reps touch 12° but don't stay
+there. The one false alarm at 12° is clip16 rep 2 (12.6° for 0.23 s). Drawn at its worst
+moment next to clip05 rep 6, a labelled sag with the same 12.6°, the two look alike: the hip
+visibly below the shoulder–ankle line in both. Re-watched, both are borderline, so the labels
+stay as they are.
+
+**Decision: 13° for 0.2 s.** Catches 3 more sags with no false alarms, by the same rule as no.
+8 (a miss is better than a false alarm). The 2 still missed are as small as clean reps get.
+
+**Caveats:** the gain comes almost entirely from clip04's later reps, whose sags were smaller,
+so the held-out set may show less. And the overlap at 12.5° points to a per-clip offset: some
+clips read 10–12° below the line on every rep (clip16 for sag; clip06 does the same for pike).
+Measuring each rep's hip relative to the person's own plank could remove it; a separate
+experiment.

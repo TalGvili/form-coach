@@ -125,11 +125,12 @@ class TestLoadRules:
         assert [r.name for r in rules] == ["shallow", "hip_sag", "hip_pike", "no_lockout"]
 
     def test_hip_rules_use_the_threshold_durations_are_measured_at(self, config_path: Path):
-        """Durations count time past hip_duration_threshold_deg; a rule with a different max
+        """Durations count time past sag_/pike_threshold_deg; a rule with a different max
         would compare its magnitude against one number and its duration against another."""
         hip = {r.name: r for r in load_rules(config_path)}
-        threshold = load_config(config_path).hip_duration_threshold_deg
-        assert hip["hip_sag"].max == hip["hip_pike"].max == threshold
+        cfg = load_config(config_path)
+        assert hip["hip_sag"].max == cfg.sag_threshold_deg
+        assert hip["hip_pike"].max == cfg.pike_threshold_deg
 
     def test_messages_and_titles_are_ascii_so_the_video_can_draw_them(self, config_path: Path):
         rules = load_rules(config_path)

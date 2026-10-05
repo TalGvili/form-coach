@@ -10,6 +10,10 @@ class AnalysisError(Exception):
     """The video can't be analysed; the message says what to change."""
 
 
+class NotAVideoError(AnalysisError):
+    """The file can't be read as a video at all."""
+
+
 class NoPersonError(AnalysisError):
     """No person was detected in most of the video, so there is nothing to measure."""
 

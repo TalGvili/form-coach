@@ -20,6 +20,7 @@ from mediapipe.tasks.python.vision import (
     RunningMode,
 )
 
+from pipeline.errors import NotAVideoError
 from pipeline.models import VideoInfo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +51,24 @@ def _frame_to_row(
         # before this conversion are wrong.
         row[i] = (landmark.x * width, landmark.y * height, landmark.z, landmark.visibility)
     return row
+
+
+def probe_video(path: str | Path) -> VideoInfo:
+    """A video's metadata, read without decoding a frame: milliseconds, so a caller can check a
+    file before the slow extraction.
+
+    n_frames here comes from container metadata, which can be wrong (see extract_landmarks),
+    so it is good for an estimate such as the duration and nothing more.
+    """
+    with cv2.VideoCapture(str(path)) as capture:
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        n_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        # an unreadable file doesn't raise: OpenCV returns an unopened capture, reading -1
+        if not capture.isOpened() or fps <= 0 or n_frames <= 0:
+            raise NotAVideoError("Please upload a video file.")
+        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    return VideoInfo(path=str(path), fps=fps, width=width, height=height, n_frames=n_frames)
 
 
 def extract_landmarks(path: str | Path) -> tuple[VideoInfo, np.ndarray]:

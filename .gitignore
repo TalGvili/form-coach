@@ -10,3 +10,6 @@ __pycache__/
 
 # Private scratchpad: half-formed ideas, not written for a reader.
 docs/notes.txt
+
+# Uploaded videos and their annotated copies, from the web app.
+data/uploads/

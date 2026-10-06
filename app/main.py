@@ -12,7 +12,10 @@ the one thread that serves every request, and slow code there would freeze them 
 
 import re
 import shutil
+import subprocess
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +43,17 @@ NO_REPS_HINT = (
     "recording before you get down."
 )
 
-app = FastAPI(title="Form Coach")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Runs once as the server starts. Without ffmpeg every upload would fail, but only after a
+    minute of analysis, so refuse to start instead."""
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError("ffmpeg not found on PATH; it re-encodes videos for the browser.")
+    yield
+
+
+app = FastAPI(title="Form Coach", lifespan=lifespan)
 # Read once at startup, so a broken config stops the server instead of failing every upload.
 TITLES = {rule.name: rule.title for rule in load_rules(CONFIG)}
 
@@ -72,7 +85,10 @@ def analyze_upload(video: UploadFile) -> dict[str, Any]:
         raise HTTPException(413, f"Videos must be under {MAX_DURATION_S} seconds.")
 
     result = analyze(path, CONFIG)
-    render(result, TITLES, UPLOADS / f"{video_id}_annotated.mp4")
+    raw = UPLOADS / f"{video_id}_raw.mp4"
+    render(result, TITLES, raw)
+    to_browser_video(raw, UPLOADS / f"{video_id}_annotated.mp4")
+    raw.unlink()
 
     report = to_json(result)
     del report["video"]["path"]  # a path on this server, of no use to the user
@@ -81,6 +97,25 @@ def analyze_upload(video: UploadFile) -> dict[str, Any]:
     report["titles"] = TITLES
     report["hint"] = None if result.reps else NO_REPS_HINT
     return report
+
+
+def to_browser_video(raw: Path, out: Path) -> None:
+    """Re-encode OpenCV's mp4v output as H.264, the codec every browser plays.
+
+    yuv420p is the pixel format browsers and phones expect; faststart moves the index to the
+    front of the file so playback starts before the download finishes; the scale caps the
+    height at 720 px, plenty on a phone (-2 keeps the proportions with an even width, which
+    H.264 needs). -an: the annotated video has no sound. check=True raises if ffmpeg fails.
+
+    Speed against size, measured on a 33 s annotated clip: the default (preset medium, crf 23)
+    took 22 s for 33 MB; veryfast with crf 26 takes 8 s for 17 MB, and the text on the
+    opening card looked the same in both.
+    """
+    command = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw), "-c:v", "libx264"]
+    command += ["-preset", "veryfast", "-crf", "26"]
+    command += ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]
+    command += ["-vf", "scale=-2:'min(720,ih)'", "-an", str(out)]
+    subprocess.run(command, check=True)
 
 
 @app.get("/videos/{video_id}")

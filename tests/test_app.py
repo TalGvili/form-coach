@@ -5,8 +5,11 @@ needed. What is tested is what this layer owns: status codes, messages, and the 
 shape. The text-file test uses the real probe_video, since refusing a non-video is its job.
 """
 
+import shutil
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -28,6 +31,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(main, "probe_video", lambda path: INFO)
     monkeypatch.setattr(main, "analyze", lambda path, config: SessionResult(INFO, [REP], [], []))
     monkeypatch.setattr(main, "render", lambda result, titles, out: out.write_bytes(b"video"))
+    monkeypatch.setattr(main, "to_browser_video", lambda raw, out: shutil.copy(raw, out))
     return TestClient(main.app)
 
 
@@ -92,3 +96,21 @@ def test_a_refused_video_returns_the_pipelines_message(
 @pytest.mark.parametrize("video_id", ["0" * 32, "..%2F..%2Fconfigs%2Fpushup.yaml", "abc"])
 def test_an_unknown_or_malformed_video_id_is_not_found(client: TestClient, video_id: str):
     assert client.get(f"/videos/{video_id}").status_code == 404
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
+def test_the_annotated_video_is_re_encoded_as_h264(tmp_path: Path):
+    """The real ffmpeg on a tiny video in OpenCV's mp4v, which browsers can't play."""
+    raw, out = tmp_path / "raw.mp4", tmp_path / "out.mp4"
+    writer = cv2.VideoWriter(str(raw), cv2.VideoWriter_fourcc(*"mp4v"), 30.0, (320, 240))
+    for shade in range(0, 250, 25):
+        writer.write(np.full((240, 320, 3), shade, dtype=np.uint8))
+    writer.release()
+
+    main.to_browser_video(raw, out)
+
+    capture = cv2.VideoCapture(str(out))
+    fourcc = int(capture.get(cv2.CAP_PROP_FOURCC)).to_bytes(4, "little").decode()
+    assert fourcc in ("avc1", "h264")
+    assert int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) == 240  # smaller than 720: not enlarged
+    capture.release()

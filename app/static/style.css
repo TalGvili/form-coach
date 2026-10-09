@@ -247,3 +247,7 @@ tbody tr:last-child td { border-bottom: 0; }
 .add-buttons { margin-top: 14px; }
 .add-buttons .big { min-width: 0; padding: 12px 28px; font-size: 1rem; }
 .fine-print { max-width: 420px; margin: 0 auto; }
+
+/* the static demo's banner */
+.demo-banner { background: var(--accent-soft); border-color: transparent; margin: 0 0 20px; }
+.demo-banner a { color: var(--accent); font-weight: 600; }

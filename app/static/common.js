@@ -1,6 +1,12 @@
-// Helpers shared by index.html and history.html.
+// Helpers shared by index.html, history.html and profiles.html.
 
 const $ = (id) => document.getElementById(id);
+
+// The static demo (GitHub Pages) is these same pages, built with <html data-demo> by
+// scripts/build_site.py. There is no server there: the pages read the bundled demo/*.json
+// instead, and uploading and profiles are switched off.
+const DEMO = document.documentElement.hasAttribute("data-demo");
+const DEMO_PROFILE = "Demo";
 
 // Builds an element with its text set through textContent, never innerHTML: text is shown
 // as text, so nothing in a response can be run as HTML.
@@ -43,6 +49,7 @@ function chooseProfile(name) {
 // Pages that work on a profile send a visitor without one to the landing page, which sends
 // them back here once they've picked.
 function requireProfile() {
+  if (DEMO) return DEMO_PROFILE;
   const name = currentProfile();
   if (!name) {
     const here = location.pathname + location.search;
@@ -66,7 +73,24 @@ function avatar(name, size = "") {
 function showProfileChip(name) {
   const chip = $("me");
   if (!chip || !name) return;
+  chip.replaceChildren(avatar(name), el("strong", "", name));
+  if (DEMO) return; // nothing to switch to
   const change = el("a", "", "Switch");
   change.href = "profiles.html";
-  chip.replaceChildren(avatar(name), el("strong", "", name), change);
+  chip.append(change);
+}
+
+// The demo's banner: what this page shows, and where the real thing is.
+function showDemoBanner(what) {
+  if (!DEMO) return;
+  const banner = $("demo-banner");
+  const repo = el("a", "", "run the app yourself");
+  repo.href = "https://github.com/TalGvili/form-coach";
+  banner.append(
+    el("strong", "", "Demo. "),
+    `${what} To analyse your own video, `,
+    repo,
+    ".",
+  );
+  banner.hidden = false;
 }

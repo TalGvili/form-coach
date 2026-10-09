@@ -17,8 +17,9 @@
            stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
     </div>
     <h1>Your progress</h1>
-    <a class="nav" href="/">← Analyse a video</a>
+    <a class="nav" href="./">← Analyse a video</a>
   </div>
+  <p class="card demo-banner" id="demo-banner" hidden></p>
   <p class="lead">Every session you've analysed, judged by today's rules.</p>
 
   <p class="card note" id="empty" hidden></p>
@@ -45,6 +46,8 @@
   // No profile chosen yet: off to the landing page, which brings the visitor back here.
   const profile = requireProfile();
   showProfileChip(profile);
+  showDemoBanner("Eleven real sessions of one person from the project's dataset; the dates " +
+    "are made up, three days apart.");
 
   let chart = null;
   let progress = null; // the last /progress response
@@ -153,8 +156,10 @@
     // newest first in the list; the chart reads left to right, oldest first
     const rows = [...progress.sessions].reverse().map((s) => {
       const row = el("tr");
+      // in the demo, only one session's report is bundled, and it opens on the main page
       const open = el("a", "jump", "Open");
-      open.href = `/?session=${s.id}`;
+      open.href = DEMO ? "./" : `./?session=${s.id}`;
+      open.hidden = DEMO && !s.demo_report;
       const fix = el("td");
       fix.append(el("i", `badge ${s.to_fix ? "fault" : "ok"}`, String(s.to_fix)));
       row.append(el("td", "", when(s.created_at)), el("td", "", s.reps), fix);
@@ -169,7 +174,8 @@
   }
 
   async function load(profile) {
-    const response = await fetch(`/progress?profile=${encodeURIComponent(profile)}`);
+    const url = DEMO ? "demo/progress.json" : `/progress?profile=${encodeURIComponent(profile)}`;
+    const response = await fetch(url);
     progress = await response.json();
     const choices = options(progress.metrics);
     const chosen = $("metric").value || choices[0].key;

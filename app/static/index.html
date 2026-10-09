@@ -19,6 +19,7 @@
     <h1>Form Coach</h1>
     <a class="nav" href="history.html">Your progress →</a>
   </div>
+  <p class="card demo-banner" id="demo-banner" hidden></p>
   <p class="lead">Film your push-ups from the side, with your whole body in the frame, and get
     feedback on every rep.</p>
 
@@ -84,6 +85,7 @@
   // No profile chosen yet: off to the landing page, which brings the visitor back here.
   const profile = requireProfile();
   showProfileChip(profile);
+  showDemoBanner("A real analysis of a set from the project's dataset, recorded in advance.");
 
   let charts = [];
 
@@ -120,7 +122,13 @@
   // index.html?session=12 opens a stored session's report, the history page's links. The
   // server judges it again with today's rules, so it can differ from the day it was filmed.
   const opened = new URLSearchParams(location.search).get("session");
-  if (opened) {
+  if (DEMO) {
+    // no server to upload to: show the bundled report instead
+    $("upload").hidden = true;
+    fetch("demo/report.json")
+      .then((response) => response.json())
+      .then((data) => showReport(data, { scroll: false }));
+  } else if (opened) {
     fetch(`/sessions/${encodeURIComponent(opened)}`)
       .then(async (response) => {
         const data = await response.json();
@@ -194,7 +202,7 @@
     return unknown ? "unknown" : "ok";
   }
 
-  function showReport(report) {
+  function showReport(report, { scroll = true } = {}) {
     // the results take the stage; the upload shrinks to one button for the next video
     $("upload").classList.add("compact");
     $("pick").hidden = false;
@@ -205,7 +213,7 @@
     showSummary(report);
     showTable(report);
     showCharts(report);
-    $("results").scrollIntoView({ behavior: "smooth" });
+    if (scroll) $("results").scrollIntoView({ behavior: "smooth" });
   }
 
   function showSummary(report) {

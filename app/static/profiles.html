@@ -37,7 +37,8 @@
   // Where to go once a profile is chosen: the page that sent the visitor here. Only a path on
   // this site is followed, never a full address, so a crafted link can't send someone away.
   const next = new URLSearchParams(location.search).get("next");
-  const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "./";
+  if (DEMO) location.replace("./"); // the demo has one built-in profile
 
   function enter(name) {
     if (!chooseProfile(name)) {

@@ -13,3 +13,6 @@ docs/notes.txt
 
 # Uploaded videos and their annotated copies, from the web app.
 data/uploads/
+
+# The static demo site, built by scripts/build_site.py.
+site/

@@ -27,13 +27,21 @@ def db(tmp_path: Path) -> sqlite3.Connection:
 def save(db, reps=(REP, UNMEASURED), profile="tal", video_id="a" * 32, when=MONDAY) -> int:
     result = SessionResult(VIDEO, list(reps), [], [])
     return store.save_session(
-        db, result, profile=profile, exercise="pushup", video_id=video_id, created_at=when
+        db,
+        result,
+        profile=profile,
+        exercise="pushup",
+        video_id=video_id,
+        created_at=when,
+        video_starts={1: 0.0, 2: 3.5},
     )
 
 
 def test_a_session_comes_back_with_the_same_reps(db):
     session = store.get_session(db, save(db))
     assert (session.profile, session.fps, session.n_frames) == ("tal", 30.0, 300)
+    assert (session.width, session.height) == (1920, 1080)
+    assert session.video_starts == {1: 0.0, 2: 3.5}
     assert session.created_at == "2026-10-05T18:00:00+00:00"
     assert session.reps[0] == REP
     # NaN != NaN, so compare the unmeasured rep field by field
@@ -69,7 +77,7 @@ def test_a_failed_save_leaves_nothing_behind(db):
 
 def test_the_reps_table_has_a_column_for_every_rep_field(db):
     columns = [row["name"] for row in db.execute("PRAGMA table_info(reps)")]
-    assert columns == ["session_id", *(f.name for f in dataclasses.fields(Rep))]
+    assert columns == ["session_id", *(f.name for f in dataclasses.fields(Rep)), "video_start_s"]
 
 
 def test_history_survives_closing_the_database(tmp_path: Path):

@@ -29,6 +29,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     """A client whose uploads go to a temporary folder, with a 10 s video that analyses to one
     rep. A test changes the fakes it cares about."""
     monkeypatch.setattr(main, "UPLOADS", tmp_path)
+    monkeypatch.setattr(main, "DB_PATH", tmp_path / "history.db")
     monkeypatch.setattr(main, "probe_video", lambda path: INFO)
     monkeypatch.setattr(main, "analyze", lambda path, config: SessionResult(INFO, [REP], [], []))
 
@@ -46,8 +47,12 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     return TestClient(main.app)
 
 
-def upload(client: TestClient, content: bytes = b"any bytes"):
-    return client.post("/analyze", files={"video": ("set.mp4", content, "video/mp4")})
+def upload(client: TestClient, content: bytes = b"any bytes", profile: str = "tal"):
+    return client.post(
+        "/analyze",
+        files={"video": ("set.mp4", content, "video/mp4")},
+        data={"profile": profile},
+    )
 
 
 def test_a_video_returns_the_report_and_a_link_to_the_annotated_video(client: TestClient):
@@ -125,3 +130,52 @@ def test_frames_are_piped_into_an_h264_video(tmp_path: Path):
     assert fourcc in ("avc1", "h264")
     assert int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) == 240  # smaller than 720: not enlarged
     capture.release()
+
+
+@pytest.mark.parametrize("profile", ["", "   ", "x" * 41])
+def test_an_upload_needs_a_name_to_save_it_under(client: TestClient, profile: str):
+    assert upload(client, profile=profile).status_code == 422
+
+
+def test_an_analysis_is_saved_to_its_profiles_history(client: TestClient):
+    session_id = upload(client, profile=" tal ").json()["session_id"]
+    assert client.get("/profiles").json() == ["tal"]  # stored without the spaces
+    listed = client.get("/sessions", params={"profile": "tal"}).json()
+    assert [s["id"] for s in listed] == [session_id]
+    assert client.get("/sessions", params={"profile": "dana"}).json() == []
+
+
+def test_a_stored_session_is_judged_by_the_current_rules(client: TestClient):
+    """The fake analysis reports no faults, but REP's lockout angle (0 deg) is below the
+    config's minimum. Read back from history, the rep is judged again and the fault appears:
+    measurements are stored, verdicts are computed when read."""
+    report = upload(client).json()
+    assert report["faults"] == []
+    stored = client.get(f"/sessions/{report['session_id']}").json()
+    assert [f["rule"] for f in stored["faults"]] == ["no_lockout"]
+    assert stored["reps"][0]["video_start_s"] == 3.5
+    assert stored["video_url"] == report["video_url"]
+    assert stored["created_at"]  # the page shows when it was filmed
+
+
+def test_a_video_without_reps_is_not_saved(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(main, "analyze", lambda path, config: SessionResult(INFO, [], [], []))
+    assert upload(client).json()["session_id"] is None
+    assert client.get("/profiles").json() == []
+
+
+def test_an_unknown_session_is_not_found(client: TestClient):
+    assert client.get("/sessions/99").status_code == 404
+
+
+def test_progress_has_one_entry_per_session_with_the_charted_metrics(client: TestClient):
+    upload(client)
+    upload(client)
+    progress = client.get("/progress", params={"profile": "tal"}).json()
+    assert progress["metrics"] == {"min_upper_arm_angle": "Depth"}
+    assert len(progress["sessions"]) == 2
+    first = progress["sessions"][0]
+    # REP (0 deg lockout) is a no_lockout fault under the current rules: judged when read
+    assert (first["reps"], first["to_fix"], first["clean_share"]) == (1, 1, 0.0)
+    assert first["average"] == {"min_upper_arm_angle": 0.0}
+    assert first["fatigue"] == {"min_upper_arm_angle": None}  # one rep has no thirds: null

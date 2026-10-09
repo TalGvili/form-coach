@@ -9,6 +9,10 @@ Reps are stored exactly as the pipeline makes them, in frames, with the session'
 them, so a row turns back into the same Rep and the rule engine runs on it unchanged.
 Seconds are for display only: frame / fps.
 
+Each rep also keeps video_start_s, where it starts in the annotated video. That is a fact about
+the rendered file, not a verdict. The file itself shows the verdicts of the day it was made:
+if the thresholds change later, its pauses keep the old ones while the report shows the new.
+
 A profile is a name, not an account: it keeps one person's sessions apart from another's,
 it doesn't prove who anyone is.
 """
@@ -35,12 +39,15 @@ CREATE TABLE IF NOT EXISTS sessions (
     exercise   TEXT NOT NULL,
     video_id   TEXT NOT NULL UNIQUE,   -- the upload: its video and landmark cache
     fps        REAL NOT NULL,
+    width      INTEGER NOT NULL,
+    height     INTEGER NOT NULL,
     n_frames   INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_by_profile ON sessions (profile, created_at);
 CREATE TABLE IF NOT EXISTS reps (
     session_id INTEGER NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
     {", ".join(f'"{f.name}" {SQL_TYPES[f.type]}' for f in REP_FIELDS)},
+    video_start_s REAL,              -- in the annotated video; NULL if it wasn't reached
     PRIMARY KEY (session_id, "index")
 );
 """
@@ -56,8 +63,11 @@ class Session:
     exercise: str
     video_id: str
     fps: float
+    width: int
+    height: int
     n_frames: int
     reps: tuple[Rep, ...]
+    video_starts: dict[int, float | None]  # rep index -> seconds into the annotated video
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -81,8 +91,10 @@ def save_session(
     exercise: str,
     video_id: str,
     created_at: datetime,
+    video_starts: dict[int, float],
 ) -> int:
-    """Store a session and its reps; return the session's id.
+    """Store a session and its reps; return the session's id. video_starts: where each rep
+    starts in the annotated video, by rep index.
 
     One transaction: `with db` commits if the block finishes and rolls back if anything in it
     raises, so a failure can't leave a session without its reps. Values go in through ?
@@ -90,22 +102,25 @@ def save_session(
     """
     with db:
         cursor = db.execute(
-            "INSERT INTO sessions (created_at, profile, exercise, video_id, fps, n_frames)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO sessions"
+            " (created_at, profile, exercise, video_id, fps, width, height, n_frames)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 created_at.isoformat(timespec="seconds"),
                 profile,
                 exercise,
                 video_id,
                 result.video.fps,
+                result.video.width,
+                result.video.height,
                 result.video.n_frames,
             ),
         )
         session_id = cursor.lastrowid
-        placeholders = ", ".join("?" * (len(REP_FIELDS) + 1))
+        placeholders = ", ".join("?" * (len(REP_FIELDS) + 2))
         db.executemany(
-            f"INSERT INTO reps (session_id, {REP_COLUMNS}) VALUES ({placeholders})",
-            [(session_id, *_to_row(rep)) for rep in result.reps],
+            f"INSERT INTO reps (session_id, {REP_COLUMNS}, video_start_s) VALUES ({placeholders})",
+            [(session_id, *_to_row(rep), video_starts.get(rep.index)) for rep in result.reps],
         )
     return session_id
 
@@ -113,7 +128,7 @@ def save_session(
 def get_session(db: sqlite3.Connection, session_id: int) -> Session | None:
     """One session with its reps, or None if there is no such session."""
     row = db.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
-    return None if row is None else _session(row, _reps(db, [session_id])[session_id])
+    return None if row is None else _session(row, *_reps(db, [session_id])[session_id])
 
 
 def list_sessions(db: sqlite3.Connection, profile: str) -> list[Session]:
@@ -122,7 +137,7 @@ def list_sessions(db: sqlite3.Connection, profile: str) -> list[Session]:
         "SELECT * FROM sessions WHERE profile = ? ORDER BY created_at, id", (profile,)
     ).fetchall()
     reps = _reps(db, [row["id"] for row in rows])
-    return [_session(row, reps[row["id"]]) for row in rows]
+    return [_session(row, *reps[row["id"]]) for row in rows]
 
 
 def list_profiles(db: sqlite3.Connection) -> list[str]:
@@ -144,9 +159,13 @@ def _to_rep(row: sqlite3.Row) -> Rep:
     return Rep(**values)
 
 
-def _reps(db: sqlite3.Connection, session_ids: list[int]) -> dict[int, tuple[Rep, ...]]:
-    """The reps of several sessions in one query, by session id, each in rep order."""
-    by_session: dict[int, list[Rep]] = {session_id: [] for session_id in session_ids}
+def _reps(
+    db: sqlite3.Connection, session_ids: list[int]
+) -> dict[int, tuple[tuple[Rep, ...], dict[int, float | None]]]:
+    """The reps of several sessions in one query, by session id, each in rep order, with
+    where each starts in the annotated video."""
+    reps: dict[int, list[Rep]] = {session_id: [] for session_id in session_ids}
+    starts: dict[int, dict[int, float | None]] = {session_id: {} for session_id in session_ids}
     if session_ids:
         marks = ", ".join("?" * len(session_ids))
         rows = db.execute(
@@ -154,10 +173,18 @@ def _reps(db: sqlite3.Connection, session_ids: list[int]) -> dict[int, tuple[Rep
             session_ids,
         )
         for row in rows:
-            by_session[row["session_id"]].append(_to_rep(row))
-    return {session_id: tuple(reps) for session_id, reps in by_session.items()}
+            reps[row["session_id"]].append(_to_rep(row))
+            starts[row["session_id"]][row["index"]] = row["video_start_s"]
+    return {session_id: (tuple(reps[session_id]), starts[session_id]) for session_id in reps}
 
 
-def _session(row: sqlite3.Row, reps: tuple[Rep, ...]) -> Session:
-    columns = ("id", "created_at", "profile", "exercise", "video_id", "fps", "n_frames")
-    return Session(*(row[column] for column in columns), reps=reps)
+def _session(
+    row: sqlite3.Row, reps: tuple[Rep, ...], video_starts: dict[int, float | None]
+) -> Session:
+    columns = ("id", "created_at", "profile", "exercise", "video_id", "fps", "width", "height")
+    return Session(
+        *(row[column] for column in columns),
+        n_frames=row["n_frames"],
+        reps=reps,
+        video_starts=video_starts,
+    )

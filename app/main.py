@@ -12,28 +12,34 @@ the one thread that serves every request, and slow code there would freeze them 
 
 import re
 import shutil
+import sqlite3
 import subprocess
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager, closing, contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+import yaml
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app import db as history
 from pipeline.errors import AnalysisError, NotAVideoError
 from pipeline.landmarks import probe_video
-from pipeline.models import VideoInfo
+from pipeline.models import SessionResult, VideoInfo
+from pipeline.progress import session_progress
 from pipeline.render import annotate
 from pipeline.rules import load_rules
-from pipeline.session import analyze, to_json
+from pipeline.session import analyze, judge, to_json
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "configs" / "pushup.yaml"
 UPLOADS = ROOT / "data" / "uploads"
+DB_PATH = ROOT / "data" / "history.db"
 STATIC = Path(__file__).resolve().parent / "static"
 
 # A server limit, not an analysis threshold. Analysing and rendering a 29 s clip took 51 s,
@@ -59,6 +65,19 @@ app = FastAPI(title="Form Coach", lifespan=lifespan)
 # Read once at startup, so a broken config stops the server instead of failing every upload.
 RULES = load_rules(CONFIG)
 TITLES = {rule.name: rule.title for rule in RULES}
+EXERCISE = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))["exercise"]
+# Progress per metric covers the rules the page charts, so no metric is named in code.
+CHARTED = {rule.metric: rule.title for rule in RULES if rule.chart}
+
+# Who a session belongs to: a name, not an account (see app/db.py). At least one visible
+# character, so "   " can't become a profile.
+Profile = Annotated[str, Form(min_length=1, max_length=40, pattern=r"\S")]
+
+
+def open_history() -> closing[sqlite3.Connection]:
+    """A connection for one request, closed when the `with` block ends. closing() is needed
+    because a sqlite3 connection's own `with` commits a transaction but doesn't close it."""
+    return closing(history.connect(DB_PATH))
 
 
 @app.exception_handler(AnalysisError)
@@ -72,8 +91,9 @@ def refuse(request: Request, error: AnalysisError) -> JSONResponse:
 
 
 @app.post("/analyze")
-def analyze_upload(video: UploadFile) -> dict[str, Any]:
-    """Save the upload, check it, analyse it and render the annotated video; return the report."""
+def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
+    """Save the upload, check it, analyse it, render the annotated video and save the session
+    to the profile's history; return the report."""
     video_id = uuid.uuid4().hex
     # The file name is ours, never the uploader's: a random id can't collide with another
     # upload's landmark cache (cached by file name) or point outside UPLOADS. OpenCV reads the
@@ -91,12 +111,106 @@ def analyze_upload(video: UploadFile) -> dict[str, Any]:
     with h264_writer(UPLOADS / f"{video_id}_annotated.mp4", result.video) as write:
         starts = annotate(result, TITLES, write)
 
+    session_id = None
+    if result.reps:  # no reps is a filming problem, not a session worth tracking
+        with open_history() as db:
+            session_id = history.save_session(
+                db,
+                result,
+                profile=profile.strip(),
+                exercise=EXERCISE,
+                video_id=video_id,
+                created_at=datetime.now(UTC),
+                video_starts=starts,
+            )
+    return report_for(result, video_id, starts, session_id)
+
+
+@app.get("/profiles")
+def profiles() -> list[str]:
+    """Every name with a saved session."""
+    with open_history() as db:
+        return history.list_profiles(db)
+
+
+@app.get("/sessions")
+def sessions(profile: str) -> list[dict[str, Any]]:
+    """A profile's sessions, oldest first, each judged by the current rules."""
+    with open_history() as db:
+        stored = history.list_sessions(db, profile)
+    summaries = []
+    for session in stored:
+        progress = session_progress(judged(session), [])
+        summaries.append(
+            {
+                "id": session.id,
+                "created_at": session.created_at,
+                "reps": progress.reps,
+                "to_fix": progress.to_fix,
+            }
+        )
+    return summaries
+
+
+@app.get("/progress")
+def progress(profile: str) -> dict[str, Any]:
+    """The numbers behind the history page's chart: one entry per session of the profile,
+    oldest first, each computed now from the stored measurements and the current rules.
+    metrics: the per-metric fields' keys, with the titles to show them under."""
+    with open_history() as db:
+        stored = history.list_sessions(db, profile)
+    return {
+        "metrics": CHARTED,
+        "sessions": [
+            {
+                "id": session.id,
+                "created_at": session.created_at,
+                **to_json(session_progress(judged(session), list(CHARTED))),
+            }
+            for session in stored
+        ],
+    }
+
+
+@app.get("/sessions/{session_id}")
+def session_report(session_id: int) -> dict[str, Any]:
+    """A stored session's report, in the same shape as POST /analyze returns, with its
+    faults recomputed from the stored measurements and the current rules."""
+    with open_history() as db:
+        session = history.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(404, "No such session.")
+    report = report_for(judged(session), session.video_id, session.video_starts, session.id)
+    report["created_at"] = session.created_at
+    return report
+
+
+def judged(session: history.Session) -> SessionResult:
+    """A stored session's reps, judged now: verdicts are never stored."""
+    video = VideoInfo(
+        path=session.video_id,
+        fps=session.fps,
+        width=session.width,
+        height=session.height,
+        n_frames=session.n_frames,
+    )
+    return judge(video, list(session.reps), RULES)
+
+
+def report_for(
+    result: SessionResult,
+    video_id: str,
+    starts: dict[int, float | None],
+    session_id: int | None,
+) -> dict[str, Any]:
+    """The JSON the page reads, for a new analysis and for a stored session alike."""
     report = to_json(result)
     del report["video"]["path"]  # a path on this server, of no use to the user
     for rep in report["reps"]:
         # where the rep starts in the annotated video, which runs longer than the original
         rep["video_start_s"] = starts.get(rep["index"])
     report["id"] = video_id
+    report["session_id"] = session_id  # None when it wasn't saved (no reps)
     report["video_url"] = f"/videos/{video_id}"
     # what the page needs to label each check and draw its limit; the numbers stay in the YAML
     report["rules"] = {

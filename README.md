@@ -11,7 +11,8 @@ behind a FastAPI service.
 
 **Status:** in progress. The analysis pipeline is evaluated (see Results) and runs from the
 command line or the web app: upload a video from a phone's browser and get an annotated video,
-a per-rep table and a depth chart. Session history is next.
+a per-rep table and a depth chart, saved to your profile's history with a progress chart. Docker
+packaging is next.
 
 ## Setup
 
@@ -40,7 +41,9 @@ winget install Gyan.FFmpeg         # Windows; macOS: brew install ffmpeg; Debian
 
 ## Running it
 
-**Web app.** Start the server and open `http://localhost:8000`:
+**Web app.** Start the server and open `http://localhost:8000`. The first page asks who's
+training: pick or add a profile, and uploads and history are kept under it ("Switch" changes it).
+
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0
@@ -57,6 +60,12 @@ The page shows a summary of the set, the annotated video (it pauses on each rep 
 to fix), a table with one row per rep whose rep number plays the video from that rep, and a
 chart of depth per rep. A video the pipeline refuses (no person in it, a single rep) gets a
 message saying what to film differently.
+
+**Your progress** lists a profile's sessions and charts, per session: reps, the share with no
+fault, average depth (with the middle half of the reps as a band) and a fatigue index (the last
+third of the set minus the first). History stores measurements, not verdicts: every session is
+judged again by the current thresholds when shown, so changing a threshold moves the whole
+history consistently. The database is `data/history.db` (SQLite).
 
 **Command line.** Prints a per-rep report and saves it as JSON in `data/reports/`; `--render`
 also writes the annotated video there:

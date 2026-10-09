@@ -12,7 +12,7 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 7 (session history). Phases 4, 5 and 6 are done.
+- Phase: 8 (Docker, README, polish). Phases 4-7 are done.
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
   `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
@@ -33,7 +33,15 @@ Full plan: @docs/form-coach-project-guide.md
   in one exception handler. `app/static/index.html` is the page (plain HTML/JS, Chart.js);
   charts come from a rule's `chart:` caption in the YAML, so the page names no rule. Tested on
   a phone over Wi-Fi.
-- Next: Phase 7, session history (SQLite).
+- Phase 7: `app/db.py` (SQLite, `data/history.db`): profiles, sessions, reps. Reps are stored
+  as `Rep`s, in frames, plus each rep's `video_start_s`; verdicts are never stored. Every
+  verdict comes from `pipeline.session.judge` (new analyses and stored sessions alike), so old
+  sessions are judged by today's YAML. `pipeline/progress.py` computes per-session numbers at
+  read time. Profiles are names, not accounts (case-insensitive); `profiles.html` is the
+  landing page, the chosen profile lives in the browser's localStorage. Endpoints: `/profiles`
+  (GET, POST), `/sessions`, `/sessions/{id}`, `/progress`. Uploads: 500 MB limit in
+  middleware, original deleted after analysis, nothing kept on refusal.
+- Next: Phase 8, Docker and the final README.
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).
@@ -56,6 +64,10 @@ Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 - ffmpeg is needed by the web app only (the server checks for it at startup); the command line
   and the tests run without it (the one ffmpeg test is skipped).
 - Endpoints that run the analysis are plain `def`, so FastAPI runs them in its thread pool.
+- One sqlite3 connection per request, opened with `open_history()` (closed by `closing()`);
+  values only through `?` placeholders.
+- The front end is plain HTML/JS: `style.css` and `common.js` are shared; text goes in through
+  `textContent`, never `innerHTML`.
 - All thresholds live in `configs/*.yaml`, no magic numbers in code.
 - Tests use synthetic signals, never the private videos in `data/`.
 - Run `ruff check .` and `pytest` before every commit.

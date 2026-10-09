@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Form Coach</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <style>
+    /* Colours as named tokens, redefined for dark mode, so nothing below hardcodes a colour. */
+    :root {
+      --page: #f9f9f7;
+      --surface: #fcfcfb;
+      --ink: #0b0b0b;
+      --ink-2: #52514e;
+      --muted: #898781;
+      --line: #e1e0d9;
+      --accent: #2a78d6;    /* the bars, buttons */
+      --good: #006300;      /* status text: darker than the fills so it reads on white */
+      --bad: #b42828;
+      --warn: #8a5a00;
+      --accent-soft: #eaf2fc;
+      --accent-shadow: rgba(42, 120, 214, 0.35);
+      --good-soft: #e3f3e3;
+      --bad-soft: #fbe7e7;
+      --warn-soft: #fdf2d8;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 20px rgba(0, 0, 0, 0.05);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #0d0d0d;
+        --surface: #1a1a19;
+        --ink: #ffffff;
+        --ink-2: #c3c2b7;
+        --muted: #898781;
+        --line: #2c2c2a;
+        --accent: #3987e5;
+        --good: #0ca30c;
+        --bad: #e05a5a;
+        --warn: #fab219;
+        --accent-soft: #16263a;
+        --accent-shadow: rgba(0, 0, 0, 0.5);
+        --good-soft: #112a14;
+        --bad-soft: #351818;
+        --warn-soft: #33280c;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    /* The browser hides [hidden] with display: none, but any display rule of ours (flex, grid)
+       beats the browser's own, and the element shows anyway. This puts hidden back on top. */
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      background: radial-gradient(900px 360px at 50% -120px, var(--accent-soft), transparent)
+        no-repeat, var(--page);
+      color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.02em; }
+    h2 { margin: 0 0 12px; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
+    h2::before {
+      content: ""; width: 4px; height: 18px; border-radius: 2px; background: var(--accent);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .logo {
+      width: 44px; height: 44px; flex: none; border-radius: 12px; display: grid;
+      place-items: center; color: #fff; box-shadow: 0 4px 12px var(--accent-shadow);
+      background: linear-gradient(135deg, #4a96ee, var(--accent));
+    }
+    .logo svg { width: 26px; height: 26px; }
+    .lead { margin-bottom: 20px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 20px; margin-top: 20px; box-shadow: var(--shadow);
+    }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat { background: var(--page); border-radius: 12px; padding: 12px; text-align: center; }
+    .stat b { display: block; font-size: 1.9rem; line-height: 1.1; }
+    .stat span { color: var(--ink-2); font-size: 0.85rem; }
+    .stat.bad b { color: var(--bad); }
+    .stat.good b { color: var(--good); }
+
+    .callout {
+      display: flex; gap: 10px; align-items: flex-start; margin: 12px 0 0;
+      background: var(--warn-soft); border-radius: 12px; padding: 12px 14px;
+    }
+    .callout::before { content: "!"; flex: none; }
+
+    .badge {
+      display: inline-grid; place-items: center; width: 28px; height: 28px;
+      border-radius: 50%; font-weight: 700; font-size: 0.95rem;
+    }
+    .badge.ok { background: var(--good-soft); }
+    .badge.fault { background: var(--bad-soft); }
+    .badge.unknown { background: var(--warn-soft); }
+    .badge.hidden { background: var(--line); }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend .badge { width: 22px; height: 22px; font-size: 0.8rem; }
+    p { margin: 0 0 12px; }
+    .lead, .note { color: var(--ink-2); }
+    .note { font-size: 0.9rem; }
+
+    /* The upload area: one big button in a drop zone, like file-converter sites. */
+    .drop {
+      background: var(--surface);
+      border: 2px dashed var(--muted);
+      border-radius: 16px;
+      padding: 40px 16px 32px;
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .drop.dragging { border-color: var(--accent); background: var(--accent-soft); }
+    .drop svg { width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px; }
+    .big {
+      display: inline-block; min-width: min(100%, 280px);
+      background: var(--accent); color: #fff; border: 0; border-radius: 12px;
+      padding: 18px 32px; font: inherit; font-size: 1.2rem; font-weight: 700;
+      cursor: pointer; box-shadow: 0 4px 14px var(--accent-shadow);
+    }
+    .big:hover { filter: brightness(1.08); }
+    .big:disabled { opacity: 0.5; cursor: default; filter: none; }
+    /* the real file input stays in the page for keyboards and screen readers, just unseen */
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip-path: inset(50%); white-space: nowrap;
+    }
+    label.big:focus-within { outline: 3px solid var(--ink); outline-offset: 3px; }
+    .or { margin: 12px 0 0; color: var(--ink-2); }
+    @media (pointer: coarse) { .or { display: none; } }  /* touch screens can't drag files */
+    .tips { margin: 16px 0 0; color: var(--muted); font-size: 0.85rem; }
+    .drop.compact {
+      padding: 14px 16px; border-style: solid; border-color: var(--line);
+      display: flex; justify-content: center;
+    }
+    .drop.compact svg, .drop.compact .or, .drop.compact .tips { display: none; }
+    .drop.compact .big { padding: 10px 22px; font-size: 1rem; min-width: 0; box-shadow: none; }
+    .chosen { margin: 0 0 16px; font-weight: 600; overflow-wrap: anywhere; }
+    .change {
+      background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer;
+      text-decoration: underline; padding: 8px; margin-top: 8px;
+    }
+
+    #status { margin-top: 16px; display: flex; gap: 12px; align-items: center;
+      justify-content: center; }
+    .spinner {
+      width: 22px; height: 22px; flex: none; border-radius: 50%;
+      border: 3px solid var(--line); border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { color: var(--bad); font-weight: 600; }
+    .done { color: var(--good); font-weight: 600; }
+    .drop.compact { flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+    .drop.compact #status { margin-top: 0; }
+
+    video { width: 100%; border-radius: 12px; background: #000; display: block; }
+
+    ul.fixes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    ul.fixes li {
+      display: grid; grid-template-columns: auto 1fr; column-gap: 10px;
+      background: var(--bad-soft); border-radius: 12px; padding: 10px 14px;
+    }
+    ul.fixes li::before { content: "✗"; color: var(--bad); font-weight: 700; grid-row: span 2; }
+    ul.fixes small { color: var(--ink-2); }
+    ul.fixes li.good { background: var(--good-soft); }
+    ul.fixes li.good::before { content: "✓"; color: var(--good); }
+
+    /* The table scrolls inside its box on a narrow phone, so the page itself never does. */
+    .scroll { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+    th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); }
+    td { white-space: nowrap; }
+    th { color: var(--ink-2); font-weight: 600; font-size: 0.85rem; }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:hover { background: var(--page); }
+    tbody tr.playing { background: var(--accent-soft); }
+    @media (max-width: 480px) { th, td { padding: 8px 4px; } }
+    tbody tr:last-child td { border-bottom: 0; }
+    .ok { color: var(--good); }
+    .fault { color: var(--bad); font-weight: 700; }
+    .unknown { color: var(--warn); }
+    .hidden { color: var(--muted); }
+    .jump {
+      background: var(--accent-soft); color: var(--accent); border: 0; border-radius: 999px;
+      padding: 4px 12px; font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .jump:hover { filter: brightness(0.95); }
+
+    .chart { position: relative; height: 260px; }
+    .card > .note:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+    </div>
+    <h1>Form Coach</h1>
+  </div>
+  <p class="lead">Film your push-ups from the side, with your whole body in the frame, and get
+    feedback on every rep.</p>
+
+  <form id="upload" class="drop">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
+    </svg>
+
+    <!-- Step 1: pick a video. The label is the big button; clicking it opens the input inside.
+         accept="video/*" makes a phone offer its camera as well as its files. -->
+    <div id="pick">
+      <label class="big">
+        <span id="pick-label">Choose a video</span>
+        <input type="file" id="file" accept="video/*" class="visually-hidden">
+      </label>
+      <p class="or">or drop it here</p>
+    </div>
+
+    <!-- Step 2: confirm, so a wrong file doesn't start a two-minute analysis. -->
+    <div id="confirm" hidden>
+      <p class="chosen" id="chosen"></p>
+      <button type="submit" class="big" id="send">Analyse my push-ups</button>
+      <br><button type="button" class="change" id="change">Choose a different video</button>
+    </div>
+
+    <div id="status" hidden></div>
+    <p class="tips">Side view · whole body in the frame · at least two reps · under a minute</p>
+  </form>
+
+  <section id="results" hidden>
+    <div class="card">
+      <h2>Your set</h2>
+      <div class="stats" id="stats"></div>
+      <p id="summary" hidden></p>
+      <ul class="fixes" id="fixes"></ul>
+      <p class="callout" id="unchecked" hidden></p>
+    </div>
+
+    <div class="card">
+      <h2>Annotated video</h2>
+      <p class="note">The video pauses on each rep with something to fix.</p>
+      <video id="video" controls playsinline></video>
+    </div>
+
+    <div class="card">
+      <h2>Rep by rep</h2>
+      <div class="scroll"><table id="table"></table></div>
+      <p class="note legend">
+        <span><i class="badge ok">✓</i> fine</span>
+        <span><i class="badge fault">✗</i> something to fix</span>
+        <span><i class="badge unknown">?</i> not checked: out of frame</span>
+        <span><i class="badge hidden">–</i> not judged: another fault on that rep comes first</span>
+      </p>
+    </div>
+
+    <!-- one chart per rule whose config has a `chart:` caption -->
+    <div id="charts"></div>
+  </section>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let charts = [];
+
+  // Picking a file, by the button or by dropping it, moves to the confirm step.
+  function fileChosen() {
+    const file = $("file").files[0];
+    if (!file) return;
+    $("chosen").textContent = `${file.name} (${(file.size / 1e6).toFixed(1)} MB)`;
+    $("upload").classList.remove("compact");
+    $("pick").hidden = true;
+    $("confirm").hidden = false;
+    $("status").hidden = true;
+  }
+  $("file").addEventListener("change", fileChosen);
+  $("change").addEventListener("click", () => $("file").click());
+
+  // Dragging a file over the box: the browser's default would open the file in the tab, so
+  // each handler calls preventDefault and the drop hands the file to the input instead.
+  const drop = $("upload");
+  drop.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    drop.classList.add("dragging");
+  });
+  drop.addEventListener("dragleave", () => drop.classList.remove("dragging"));
+  drop.addEventListener("drop", (event) => {
+    event.preventDefault();
+    drop.classList.remove("dragging");
+    if (event.dataTransfer.files.length) {
+      $("file").files = event.dataTransfer.files;
+      fileChosen();
+    }
+  });
+
+  $("upload").addEventListener("submit", async (event) => {
+    event.preventDefault(); // stay on this page instead of the browser submitting the form
+    const body = new FormData();
+    body.append("video", $("file").files[0]); // the name the endpoint's parameter has
+
+    $("send").disabled = true;
+    $("change").hidden = true;
+    $("results").hidden = true;
+    const stopTimer = showProgress();
+    try {
+      const response = await fetch("/analyze", { method: "POST", body });
+      const data = await response.json();
+      if (!response.ok) {
+        // our refusals carry a sentence for the user; anything else gets a generic one
+        throw new Error(typeof data.detail === "string" ? data.detail : "Something went wrong.");
+      }
+      const took = stopTimer();
+      showReport(data);
+      showStatus(`✓ Analysis complete in ${clock(took)}. Your results are below.`, "done");
+    } catch (error) {
+      stopTimer();
+      showStatus(error.message, "error");
+    } finally {
+      $("send").disabled = false;
+      $("change").hidden = false;
+    }
+  });
+
+  function showProgress() {
+    // Analysis takes one to two minutes; a running clock shows the page hasn't stalled.
+    const started = Date.now();
+    const tick = () => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      showStatus(`Analysing… ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` +
+        " (usually a minute or two)", "busy");
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => {
+      clearInterval(timer);
+      return (Date.now() - started) / 1000; // how long it took, for the "complete" line
+    };
+  }
+
+  function showStatus(text, kind) {
+    const status = $("status");
+    status.replaceChildren();
+    if (kind === "busy") status.append(el("div", "spinner"));
+    status.append(el("span", kind === "busy" ? "" : kind, text));
+    status.hidden = false;
+  }
+
+  // Builds an element with its text set through textContent, never innerHTML: text is shown
+  // as text, so nothing in a response can be run as HTML.
+  function el(tag, className = "", text = "") {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    node.textContent = text;
+    return node;
+  }
+
+  // What happened to one check on one rep: "fault", "hidden" (suppressed), "unknown" or "ok".
+  function outcome(report, rep, rule) {
+    const fault = report.faults.find((f) => f.rep_index === rep && f.rule === rule);
+    if (fault) return fault.suppressed ? "hidden" : "fault";
+    const unknown = report.unevaluated.some((u) => u.rep_index === rep && u.rule === rule);
+    return unknown ? "unknown" : "ok";
+  }
+
+  function showReport(report) {
+    // the results take the stage; the upload shrinks to one button for the next video
+    $("upload").classList.add("compact");
+    $("pick").hidden = false;
+    $("confirm").hidden = true;
+    $("pick-label").textContent = "Analyse another video";
+    $("results").hidden = false;
+    $("video").src = report.video_url;
+    showSummary(report);
+    showTable(report);
+    showCharts(report);
+    $("results").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function showSummary(report) {
+    const reps = report.reps.length;
+    const shown = report.faults.filter((f) => !f.suppressed);
+    const faulty = new Set(shown.map((f) => f.rep_index)).size;
+    const tile = (value, label, tone) => {
+      const box = el("div", `stat ${tone}`);
+      box.append(el("b", "", value), el("span", "", label));
+      return box;
+    };
+    $("stats").hidden = reps === 0;
+    $("stats").replaceChildren(
+      tile(reps, "reps", ""),
+      tile(faulty, "to fix", faulty ? "bad" : ""),
+      tile(reps - faulty, "no fault", reps - faulty ? "good" : ""),
+    );
+    $("summary").hidden = !report.hint;
+    $("summary").textContent = report.hint ?? "";
+
+    // one item per message, with the reps it applies to
+    const byMessage = new Map();
+    for (const f of shown) byMessage.set(f.message, [...(byMessage.get(f.message) ?? []), f.rep_index]);
+    $("fixes").replaceChildren(...[...byMessage].map(([message, reps]) => {
+      const item = el("li");
+      const which = el("small", "", `rep${reps.length > 1 ? "s" : ""} ${reps.join(", ")}`);
+      item.append(el("span", "", message), which);
+      return item;
+    }));
+    if (reps > 0 && shown.length === 0) {
+      // a clean set gets said out loud, not shown as an empty list
+      $("fixes").append(el("li", "good", "No faults found. Nice set!"));
+    }
+
+    // checks that couldn't be made, as on the video's opening card
+    const missing = new Map();
+    for (const u of report.unevaluated) missing.set(u.rule, (missing.get(u.rule) ?? 0) + 1);
+    $("unchecked").hidden = missing.size === 0;
+    $("unchecked").textContent = "Not checked: " +
+      [...missing].map(([rule, n]) => `${report.rules[rule].title} (${n} of ${reps} reps)`).join(", ") +
+      ". The camera couldn't see every body part it needs; keep your whole body in the frame.";
+  }
+
+  function showTable(report) {
+    const rules = Object.keys(report.rules); // in the config's order
+    const symbol = { ok: "✓", fault: "✗", unknown: "?", hidden: "–" };
+    const label = { ok: "fine", fault: "something to fix", unknown: "not checked", hidden: "not judged" };
+
+    const head = el("tr");
+    head.append(el("th", "", "Rep"));
+    for (const rule of rules) head.append(el("th", "", report.rules[rule].title));
+
+    const rows = report.reps.map((rep) => {
+      const row = el("tr");
+      // the rep number is a button that plays the annotated video from this rep's start,
+      // a time in the annotated video, which runs longer than the original by its pauses
+      const first = el("td");
+      if (rep.video_start_s == null) { // == also catches undefined
+        first.textContent = rep.index;
+      } else {
+        const button = el("button", "jump", `▶ ${rep.index}`);
+        button.title = `Play from ${clock(rep.video_start_s)}`;
+        button.setAttribute("aria-label", `Play rep ${rep.index}`);
+        button.addEventListener("click", () => playFrom(rep.video_start_s));
+        first.append(button);
+      }
+      row.dataset.start = rep.video_start_s ?? "";  // ?? also turns undefined into ""
+      row.append(first);
+      for (const rule of rules) {
+        const result = outcome(report, rep.index, rule);
+        const cell = el("td");
+        const badge = el("i", `badge ${result}`, symbol[result]);
+        badge.title = label[result];
+        cell.setAttribute("aria-label", label[result]); // read out by screen readers
+        cell.append(badge);
+        row.append(cell);
+      }
+      return row;
+    });
+    $("table").replaceChildren(el("thead"), el("tbody"));
+    $("table").tHead.append(head);
+    $("table").tBodies[0].append(...rows);
+  }
+
+  // While the video plays, highlight the row of the rep on screen: the last rep that has
+  // started by now. Seeking to a rep's start lands a hair before it (the video stores times in
+  // its own units), so "started" allows 0.05 s, under two frames.
+  $("video").addEventListener("timeupdate", () => {
+    const now = $("video").currentTime + 0.05;
+    const rows = [...$("table").tBodies[0].rows];
+    const started = rows.filter((row) => row.dataset.start !== "" && Number(row.dataset.start) <= now);
+    for (const row of rows) row.classList.toggle("playing", row === started.at(-1));
+  });
+
+  function clock(seconds) {
+    const s = Math.floor(seconds);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
+
+  function playFrom(seconds) {
+    const video = $("video");
+    video.currentTime = seconds;
+    video.play();
+    video.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function showCharts(report) {
+    for (const chart of charts) chart.destroy(); // a canvas holds one chart: drop the last upload's
+    charts = [];
+    const sections = Object.entries(report.rules)
+      .filter(([, rule]) => rule.chart)
+      .map(([name, rule]) => chartSection(report, name, rule))
+      .filter((section) => section !== null);
+    $("charts").replaceChildren(...sections);
+  }
+
+  // One rule's metric per rep, with its limit as a dashed line. Nothing here knows the exercise:
+  // the metric, limit, title and caption all come from the config through the response.
+  function chartSection(report, name, rule) {
+    const values = report.reps.map((r) => r[rule.metric]);
+    if (values.every((v) => v === null)) return null; // never measured: nothing to draw
+
+    const unit = rule.metric.endsWith("_s") ? " s" : "°"; // Rep fields: degrees, or _s seconds
+    const limit = rule.max ?? rule.min;
+    const outcomes = report.reps.map((r) => outcome(report, r.index, name));
+    // a rep this rule wasn't judged on gets a grey bar, so a tall bar there isn't read as a fault
+    const judged = outcomes.map((o) => o === "ok" || o === "fault");
+
+    const section = el("section", "card");
+    const canvas = el("canvas");
+    const box = el("div", "chart");
+    box.append(canvas);
+    section.append(
+      el("h2", "", `${rule.title} per rep`),
+      el("p", "note", `${rule.chart} Blue bars past the dashed line (${limit}${unit}) were ` +
+        "flagged; grey bars are reps where this wasn't judged."),
+      box,
+    );
+
+    const css = (token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    const verdict = { ok: "fine", fault: rule.message, hidden: "not judged", unknown: "not checked" };
+    charts.push(new Chart(canvas, {
+      data: {
+        labels: report.reps.map((r) => r.index),
+        datasets: [
+          {
+            type: "bar",
+            data: values, // null (not measured) leaves a gap rather than a made-up bar
+            backgroundColor: judged.map((j) => css(j ? "--accent" : "--muted")),
+            maxBarThickness: 24,
+            borderRadius: 4,
+            borderSkipped: "start", // rounded at the top, square on the axis
+          },
+          {
+            type: "line",
+            data: values.map(() => limit),
+            borderColor: css("--ink-2"),
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            pointHitRadius: 0,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }, // one series: the heading names it
+          tooltip: {
+            filter: (item) => item.datasetIndex === 0, // tooltips for the bars only
+            callbacks: {
+              label: (item) =>
+                `${item.parsed.y.toFixed(1)}${unit}: ${verdict[outcomes[item.dataIndex]]}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: css("--muted"), maxRotation: 0 },
+            title: { display: true, text: "Rep", color: css("--muted") },
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: css("--line") },
+            border: { display: false },
+            ticks: { color: css("--muted"), callback: (v) => `${v}${unit}` },
+          },
+        },
+      },
+    }));
+    return section;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# What `docker build` never sends to the image.
+
+# data/ holds the private videos, their landmark caches and the history: none of it belongs in
+# an image that might be shared. The container gets an empty data/ and a volume for it.
+data/
+
+# Downloaded during the build instead, with a checksum.
+models/
+
+.venv/
+.git/
+docs/notes.txt
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+.vscode/
+.idea/

@@ -21,7 +21,6 @@ matplotlib==3.11.2
 mediapipe==1.0.1
 numpy==2.5.3
 opencv-contrib-python==5.0.0.93
-opencv-python==5.0.0.93
 packaging==26.3
 pandas==3.0.6
 pillow==12.3.0

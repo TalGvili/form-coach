@@ -16,7 +16,18 @@ packaging is next.
 
 ## Setup
 
-Python 3.12 — MediaPipe does not publish wheels for newer versions.
+**With Docker** (Python, ffmpeg and the pose model included; the image is about 1.9 GB):
+
+```bash
+docker build -t form-coach .
+docker run -p 127.0.0.1:8000:8000 -v form-coach-data:/app/data form-coach
+```
+
+Then open `http://localhost:8000`. The volume keeps the history and annotated videos across
+restarts. To let a phone on the same Wi-Fi connect, use `-p 8000:8000` instead, on a network you
+trust (see below).
+
+**Without Docker.** Python 3.12 — MediaPipe does not publish wheels for newer versions.
 
 ```bash
 python -m venv .venv
@@ -210,6 +221,11 @@ What the method structurally cannot do, and why tuning won't fix it.
 - **A lower-back arch while the hips stay in line can't be measured.** The pose model has no
   landmarks along the spine, only shoulders and hips. Sag and pike are detectable because they
   move the hip landmark itself off the shoulder–ankle line; an arch does not.
+- **Results can differ slightly between platforms.** MediaPipe's builds for Windows and Linux
+  compute landmarks a few pixels apart (a median of 2.6 px on one clip), and in video mode each
+  frame's tracking starts from the previous one. A value sitting on a hard line can flip: one
+  clip's elbow was at y = 1079 of 1080 on Windows and 1084 in the Linux container, so one depth
+  check became "could not evaluate". The evaluation numbers above were measured on Windows.
 - **Side view only.** Every measurement assumes the camera is roughly perpendicular to the body,
   at floor-to-hip height, with the whole body in frame. Front or angled views distort the joint
   angles the rules depend on.

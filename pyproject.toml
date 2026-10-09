@@ -5,7 +5,7 @@ description = "Analyzes phone video of push-ups and gives per-rep form feedback.
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "mediapipe",        # pose landmarks (Tasks API)
-    "opencv-python",    # video read/write, drawing
+    "opencv-contrib-python",  # video read/write, drawing; the variant mediapipe requires
     "numpy",            # landmark arrays, angle math
     "scipy",            # smoothing, peak finding
     "pyyaml",           # rule config

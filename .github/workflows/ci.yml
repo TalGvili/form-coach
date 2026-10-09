@@ -32,3 +32,25 @@ jobs:
       # Tests use synthetic signals only; the private videos are not in the repo.
       - name: Test
         run: pytest
+
+  # The web app's image. The tests never create the pose model, so a system library missing
+  # from the image (libEGL was) would only show on the first upload; loading MediaPipe's native
+  # library here catches it, and a request to the running server checks it starts.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the image
+        run: docker build -t form-coach .
+
+      - name: MediaPipe's native library loads
+        run: >
+          docker run --rm form-coach python -c
+          "from mediapipe.tasks.python.core import mediapipe_c_bindings as m; m.load_raw_library()"
+
+      - name: The server starts and answers
+        run: |
+          docker run -d --name form-coach -p 8000:8000 form-coach
+          curl --silent --show-error --fail --retry 20 --retry-delay 1 --retry-all-errors \
+            http://localhost:8000/profiles

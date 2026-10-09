@@ -9,8 +9,9 @@ to track progress over time.
 Built with MediaPipe pose estimation, SciPy signal processing and a config-driven rule engine
 behind a FastAPI service.
 
-**Status:** in progress. The analysis pipeline works from the command line and is evaluated
-(see Results); the web app is next.
+**Status:** in progress. The analysis pipeline is evaluated (see Results) and runs from the
+command line or the web app: upload a video from a phone's browser and get an annotated video,
+a per-rep table and a depth chart. Session history is next.
 
 ## Setup
 
@@ -28,6 +29,37 @@ The pose model is a 9 MB binary and is not tracked in git, so download it separa
 mkdir -p models
 curl -o models/pose_landmarker_full.task \
   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+```
+
+The web app also needs [ffmpeg](https://ffmpeg.org/download.html) on the `PATH`; it encodes
+the annotated video as H.264, the codec browsers play. The command line doesn't need it.
+
+```bash
+winget install Gyan.FFmpeg         # Windows; macOS: brew install ffmpeg; Debian/Ubuntu: apt install ffmpeg
+```
+
+## Running it
+
+**Web app.** Start the server and open `http://localhost:8000`:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0
+```
+
+`--host 0.0.0.0` lets other devices on the same Wi-Fi connect: on a phone, open
+`http://<your computer's local IP>:8000`, and the upload button offers the camera. Videos must
+be under a minute; analysing a 30-second set takes about a minute.
+
+The page shows a summary of the set, the annotated video (it pauses on each rep with something
+to fix), a table with one row per rep whose rep number plays the video from that rep, and a
+chart of depth per rep. A video the pipeline refuses (no person in it, a single rep) gets a
+message saying what to film differently.
+
+**Command line.** Prints a per-rep report and saves it as JSON in `data/reports/`; `--render`
+also writes the annotated video there:
+
+```bash
+python analyze.py path/to/video.mp4 --render
 ```
 
 The push-up clips are private and not in the repo either, so the pipeline can't be re-run on

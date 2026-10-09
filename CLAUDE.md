@@ -12,7 +12,7 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 6 (web app). Phases 4 and 5 are done.
+- Phase: 7 (session history). Phases 4, 5 and 6 are done.
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
   `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
@@ -25,7 +25,15 @@ Full plan: @docs/form-coach-project-guide.md
 - Phase 5: `eval/evaluate.py` and `eval/EXPERIMENTS.md` (experiments 1-12). Tuned on the
   training clips; the held-out run was made ONCE at commit 3d5423a and its results are final.
   Do not tune against the held-out clips or relabel them.
-- Next: Phase 6, the web app.
+- Phase 6: `app/main.py` (FastAPI). `POST /analyze` saves the upload under a random id,
+  checks it with `probe_video` before the slow extraction (not a video 400, over 60 s 413),
+  calls `analyze`, then `annotate` piped into ffmpeg (`h264_writer`, H.264 for browsers), and
+  returns the report with each rep's `video_start_s` in the annotated video. `GET /videos/{id}`
+  only accepts ids of the issued form. Every `pipeline.errors.AnalysisError` becomes a response
+  in one exception handler. `app/static/index.html` is the page (plain HTML/JS, Chart.js);
+  charts come from a rule's `chart:` caption in the YAML, so the page names no rule. Tested on
+  a phone over Wi-Fi.
+- Next: Phase 7, session history (SQLite).
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).
@@ -43,6 +51,11 @@ Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 - Config loaders take the config path as a required argument; the entry point (a CLI) chooses
   the file. Tests get it from the `config_path` fixture in `tests/conftest.py`.
 - Pipeline code never imports anything web-related; `app/` never contains analysis logic.
+- A video the pipeline refuses raises a subclass of `pipeline.errors.AnalysisError` with a
+  message written for the user; callers catch the base class.
+- ffmpeg is needed by the web app only (the server checks for it at startup); the command line
+  and the tests run without it (the one ffmpeg test is skipped).
+- Endpoints that run the analysis are plain `def`, so FastAPI runs them in its thread pool.
 - All thresholds live in `configs/*.yaml`, no magic numbers in code.
 - Tests use synthetic signals, never the private videos in `data/`.
 - Run `ruff check .` and `pytest` before every commit.

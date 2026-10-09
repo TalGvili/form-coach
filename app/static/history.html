@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Form Coach: progress</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="common.js"></script>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+    </div>
+    <h1>Your progress</h1>
+    <a class="nav" href="/">← Analyse a video</a>
+  </div>
+  <p class="lead">Every session you've analysed, judged by today's rules.</p>
+
+  <div class="card picker">
+    <label for="who">Who's training?</label>
+    <select id="who"></select>
+  </div>
+
+  <p class="card note" id="empty" hidden></p>
+
+  <section id="content" hidden>
+    <div class="card">
+      <h2>Over time</h2>
+      <label class="visually-hidden" for="metric">What to show</label>
+      <select id="metric"></select>
+      <p class="note" id="explain"></p>
+      <div class="chart"><canvas id="chart"></canvas></div>
+      <p class="note" id="few" hidden>A few sessions can't show a trend yet: one set differs
+        from the next by more than you improve in a week. Keep filming.</p>
+    </div>
+
+    <div class="card">
+      <h2>Sessions</h2>
+      <div class="scroll"><table id="sessions"></table></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  let chart = null;
+  let progress = null; // the last /progress response
+
+  // What the dropdown offers. The per-metric options come from the server's list of charted
+  // metrics, so this page names no metric; "unit" and "explain" are how each reads.
+  function options(metrics) {
+    const list = [
+      { key: "reps", label: "Reps per session", unit: "", value: (s) => s.reps,
+        explain: "How many completed reps each session had." },
+      { key: "clean", label: "Reps with no fault (%)", unit: "%",
+        value: (s) => (s.clean_share === null ? null : Math.round(s.clean_share * 100)),
+        explain: "The share of each session's reps with nothing to fix." },
+    ];
+    for (const [metric, title] of Object.entries(metrics)) {
+      list.push({ key: `avg:${metric}`, label: `${title}: average`, unit: "°", band: metric,
+        value: (s) => s.average[metric],
+        explain: `${title} averaged over each session's reps; the shaded band is the middle ` +
+          "half of the reps, so a wide band means an uneven set." });
+      list.push({ key: `fatigue:${metric}`, label: `${title}: fatigue`, unit: "°",
+        value: (s) => s.fatigue[metric],
+        explain: `${title} in the last third of the set minus the first third. Above zero: ` +
+          "higher at the end than at the start, so it changed as you tired. Needs three reps." });
+    }
+    return list;
+  }
+
+  // The mean of the last `size` sessions with a value, at each session: it smooths the
+  // day-to-day noise so a real trend shows.
+  function rolling(values, size = 3) {
+    return values.map((_, i) => {
+      const window = values.slice(Math.max(0, i - size + 1), i + 1).filter((v) => v !== null);
+      return window.length ? window.reduce((a, b) => a + b, 0) / window.length : null;
+    });
+  }
+
+  function drawChart() {
+    const option = options(progress.metrics).find((o) => o.key === $("metric").value);
+    const sessions = progress.sessions;
+    const values = sessions.map(option.value);
+    $("explain").textContent = option.explain;
+    $("few").hidden = sessions.length >= 5;
+
+    const datasets = [];
+    if (option.band) {
+      // two invisible lines, the second filled down to the first: the middle half of the reps
+      const [low, high] = [0, 1].map((i) =>
+        sessions.map((s) => s.middle_half[option.band]?.[i] ?? null));
+      datasets.push(
+        { label: "low", data: low, pointRadius: 0, borderWidth: 0, fill: false },
+        { label: "Middle half of reps", data: high, pointRadius: 0, borderWidth: 0,
+          fill: "-1", backgroundColor: css("--accent-band") },
+      );
+    }
+    datasets.push(
+      { label: "Session", data: values, borderColor: css("--accent"),
+        backgroundColor: css("--accent"), borderWidth: 2, pointRadius: 4, pointHoverRadius: 6 },
+      { label: "Average of the last 3", data: rolling(values), borderColor: css("--ink-2"),
+        borderWidth: 2, borderDash: [6, 4], pointRadius: 0 },
+    );
+
+    if (chart) chart.destroy(); // a canvas holds one chart
+    chart = new Chart($("chart"), {
+      type: "line",
+      // short dates under the axis (they must fit on a phone); the full time in the tooltip
+      data: {
+        labels: sessions.map((s) =>
+          new Date(s.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })),
+        datasets,
+      },
+      options: {
+        maintainAspectRatio: false,
+        spanGaps: true, // a session without a value doesn't break the line
+        interaction: { mode: "index", intersect: false }, // hover anywhere above a session
+        plugins: {
+          legend: {
+            labels: { color: css("--ink-2"), filter: (item) => item.text !== "low" },
+          },
+          tooltip: {
+            filter: (item) => item.dataset.label !== "low",
+            callbacks: {
+              title: (items) => when(sessions[items[0].dataIndex].created_at),
+              label: (item) => {
+                if (item.dataset.label === "Middle half of reps") {
+                  const lowValue = item.chart.data.datasets[0].data[item.dataIndex];
+                  return ` Middle half: ${lowValue?.toFixed(1)}–${item.parsed.y.toFixed(1)}${option.unit}`;
+                }
+                return ` ${item.dataset.label}: ${item.parsed.y.toFixed(1)}${option.unit}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: css("--muted"), maxRotation: 0,
+            autoSkip: true } },
+          y: { grid: { color: css("--line") }, border: { display: false },
+            ticks: { color: css("--muted"), callback: (v) => `${v}${option.unit}` } },
+        },
+      },
+    });
+  }
+
+  function showSessions() {
+    const head = el("tr");
+    head.append(el("th", "", "When"), el("th", "", "Reps"), el("th", "", "To fix"), el("th"));
+    // newest first in the list; the chart reads left to right, oldest first
+    const rows = [...progress.sessions].reverse().map((s) => {
+      const row = el("tr");
+      const open = el("a", "jump", "Open");
+      open.href = `/?session=${s.id}`;
+      const fix = el("td");
+      fix.append(el("i", `badge ${s.to_fix ? "fault" : "ok"}`, String(s.to_fix)));
+      row.append(el("td", "", when(s.created_at)), el("td", "", s.reps), fix);
+      const last = el("td");
+      last.append(open);
+      row.append(last);
+      return row;
+    });
+    $("sessions").replaceChildren(el("thead"), el("tbody"));
+    $("sessions").tHead.append(head);
+    $("sessions").tBodies[0].append(...rows);
+  }
+
+  async function load(profile) {
+    try { localStorage.setItem("profile", profile); } catch {}
+    const response = await fetch(`/progress?profile=${encodeURIComponent(profile)}`);
+    progress = await response.json();
+    const choices = options(progress.metrics);
+    const chosen = $("metric").value || choices[0].key;
+    $("metric").replaceChildren(...choices.map((o) => {
+      const item = el("option", "", o.label);
+      item.value = o.key;
+      return item;
+    }));
+    $("metric").value = choices.some((o) => o.key === chosen) ? chosen : choices[0].key;
+    $("content").hidden = false;
+    drawChart();
+    showSessions();
+  }
+
+  async function start() {
+    const names = await (await fetch("/profiles")).json();
+    if (names.length === 0) {
+      $("empty").textContent = "No sessions yet. Analyse a video first, and it appears here.";
+      $("empty").hidden = false;
+      document.querySelector(".picker").hidden = true;
+      return;
+    }
+    let remembered = null;
+    try { remembered = localStorage.getItem("profile"); } catch {}
+    $("who").replaceChildren(...names.map((name) => el("option", "", name)));
+    $("who").value = names.includes(remembered) ? remembered : names[0];
+    load($("who").value);
+  }
+
+  $("who").addEventListener("change", () => load($("who").value));
+  $("metric").addEventListener("change", drawChart);
+  start();
+</script>
+</body>
+</html>

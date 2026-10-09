@@ -1,0 +1,221 @@
+/* Shared by index.html and history.html. */
+
+/* Colours as named tokens, redefined for dark mode, so nothing below hardcodes a colour. */
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --line: #e1e0d9;
+  --accent: #2a78d6;    /* the bars, buttons */
+  --good: #006300;      /* status text: darker than the fills so it reads on white */
+  --bad: #b42828;
+  --warn: #8a5a00;
+  --accent-soft: #eaf2fc;
+  --accent-shadow: rgba(42, 120, 214, 0.35);
+  --accent-band: rgba(42, 120, 214, 0.14);  /* the progress chart's middle-half band */
+  --good-soft: #e3f3e3;
+  --bad-soft: #fbe7e7;
+  --warn-soft: #fdf2d8;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 20px rgba(0, 0, 0, 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --line: #2c2c2a;
+    --accent: #3987e5;
+    --good: #0ca30c;
+    --bad: #e05a5a;
+    --warn: #fab219;
+    --accent-soft: #16263a;
+    --accent-shadow: rgba(0, 0, 0, 0.5);
+    --accent-band: rgba(57, 135, 229, 0.24);
+    --good-soft: #112a14;
+    --bad-soft: #351818;
+    --warn-soft: #33280c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+/* The browser hides [hidden] with display: none, but any display rule of ours (flex, grid)
+   beats the browser's own, and the element shows anyway. This puts hidden back on top. */
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: radial-gradient(900px 360px at 50% -120px, var(--accent-soft), transparent)
+    no-repeat, var(--page);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.02em; }
+h2 { margin: 0 0 12px; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
+h2::before {
+  content: ""; width: 4px; height: 18px; border-radius: 2px; background: var(--accent);
+}
+
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.nav {
+  margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none;
+  padding: 8px 12px; border-radius: 999px; background: var(--accent-soft); white-space: nowrap;
+}
+.nav:hover { filter: brightness(0.96); }
+
+/* history page */
+.picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.picker label { font-weight: 600; }
+select {
+  font: inherit; color: var(--ink); background: var(--page);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+#metric { width: min(100%, 320px); margin-bottom: 8px; }
+a.jump { display: inline-block; text-decoration: none; }
+@media (max-width: 480px) {
+  h1 { font-size: 1.4rem; }
+  .nav { padding: 6px 10px; font-size: 0.9rem; }
+}
+.logo {
+  width: 44px; height: 44px; flex: none; border-radius: 12px; display: grid;
+  place-items: center; color: #fff; box-shadow: 0 4px 12px var(--accent-shadow);
+  background: linear-gradient(135deg, #4a96ee, var(--accent));
+}
+.logo svg { width: 26px; height: 26px; }
+.lead { margin-bottom: 20px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+  padding: 20px; margin-top: 20px; box-shadow: var(--shadow);
+}
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.stat { background: var(--page); border-radius: 12px; padding: 12px; text-align: center; }
+.stat b { display: block; font-size: 1.9rem; line-height: 1.1; }
+.stat span { color: var(--ink-2); font-size: 0.85rem; }
+.stat.bad b { color: var(--bad); }
+.stat.good b { color: var(--good); }
+
+.callout {
+  display: flex; gap: 10px; align-items: flex-start; margin: 12px 0 0;
+  background: var(--warn-soft); border-radius: 12px; padding: 12px 14px;
+}
+.callout::before { content: "!"; flex: none; }
+
+.badge {
+  font-style: normal;  /* <i> is italic by default */
+  display: inline-grid; place-items: center; width: 28px; height: 28px;
+  border-radius: 50%; font-weight: 700; font-size: 0.95rem;
+}
+.badge.ok { background: var(--good-soft); }
+.badge.fault { background: var(--bad-soft); }
+.badge.unknown { background: var(--warn-soft); }
+.badge.hidden { background: var(--line); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 0; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .badge { width: 22px; height: 22px; font-size: 0.8rem; }
+p { margin: 0 0 12px; }
+.lead, .note { color: var(--ink-2); }
+.note { font-size: 0.9rem; }
+
+/* The upload area: one big button in a drop zone, like file-converter sites. */
+.drop {
+  background: var(--surface);
+  border: 2px dashed var(--muted);
+  border-radius: 16px;
+  padding: 40px 16px 32px;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.drop.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.drop svg { width: 48px; height: 48px; color: var(--accent); margin-bottom: 12px; }
+.big {
+  display: inline-block; min-width: min(100%, 280px);
+  background: var(--accent); color: #fff; border: 0; border-radius: 12px;
+  padding: 18px 32px; font: inherit; font-size: 1.2rem; font-weight: 700;
+  cursor: pointer; box-shadow: 0 4px 14px var(--accent-shadow);
+}
+.big:hover { filter: brightness(1.08); }
+.big:disabled { opacity: 0.5; cursor: default; filter: none; }
+/* the real file input stays in the page for keyboards and screen readers, just unseen */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+label.big:focus-within { outline: 3px solid var(--ink); outline-offset: 3px; }
+.or { margin: 12px 0 0; color: var(--ink-2); }
+@media (pointer: coarse) { .or { display: none; } }  /* touch screens can't drag files */
+.tips { margin: 16px 0 0; color: var(--muted); font-size: 0.85rem; }
+.drop.compact {
+  padding: 14px 16px; border-style: solid; border-color: var(--line);
+  display: flex; justify-content: center;
+}
+.drop.compact svg, .drop.compact .or, .drop.compact .tips { display: none; }
+.drop.compact .big { padding: 10px 22px; font-size: 1rem; min-width: 0; box-shadow: none; }
+.who { margin: 0 0 20px; }
+.who label { display: block; font-weight: 600; margin-bottom: 6px; }
+.who input {
+  width: min(100%, 280px); padding: 12px 14px; text-align: center;
+  font: inherit; color: var(--ink); background: var(--page);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.who input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.drop.compact .who { display: none; }
+.chosen { margin: 0 0 16px; font-weight: 600; overflow-wrap: anywhere; }
+.change {
+  background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer;
+  text-decoration: underline; padding: 8px; margin-top: 8px;
+}
+
+#status { margin-top: 16px; display: flex; gap: 12px; align-items: center;
+  justify-content: center; }
+.spinner {
+  width: 22px; height: 22px; flex: none; border-radius: 50%;
+  border: 3px solid var(--line); border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { color: var(--bad); font-weight: 600; }
+.done { color: var(--good); font-weight: 600; }
+.drop.compact { flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.drop.compact #status { margin-top: 0; }
+
+video { width: 100%; border-radius: 12px; background: #000; display: block; }
+
+ul.fixes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+ul.fixes li {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 10px;
+  background: var(--bad-soft); border-radius: 12px; padding: 10px 14px;
+}
+ul.fixes li::before { content: "✗"; color: var(--bad); font-weight: 700; grid-row: span 2; }
+ul.fixes small { color: var(--ink-2); }
+ul.fixes li.good { background: var(--good-soft); }
+ul.fixes li.good::before { content: "✓"; color: var(--good); }
+
+/* The table scrolls inside its box on a narrow phone, so the page itself never does. */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; text-align: center; border-bottom: 1px solid var(--line); }
+td { white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 600; font-size: 0.85rem; }
+th:first-child, td:first-child { text-align: left; }
+tbody tr:hover { background: var(--page); }
+tbody tr.playing { background: var(--accent-soft); }
+@media (max-width: 480px) { th, td { padding: 8px 4px; } }
+tbody tr:last-child td { border-bottom: 0; }
+.ok { color: var(--good); }
+.fault { color: var(--bad); font-weight: 700; }
+.unknown { color: var(--warn); }
+.hidden { color: var(--muted); }
+.jump {
+  background: var(--accent-soft); color: var(--accent); border: 0; border-radius: 999px;
+  padding: 4px 12px; font: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+}
+.jump:hover { filter: brightness(0.95); }
+
+.chart { position: relative; height: 260px; }
+.card > .note:last-child { margin-bottom: 0; }

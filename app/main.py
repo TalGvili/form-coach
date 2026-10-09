@@ -26,10 +26,11 @@ import yaml
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app import db as history
 from pipeline.errors import AnalysisError, NotAVideoError
-from pipeline.landmarks import probe_video
+from pipeline.landmarks import cache_path, probe_video
 from pipeline.models import SessionResult, VideoInfo
 from pipeline.progress import session_progress
 from pipeline.render import annotate
@@ -45,6 +46,9 @@ STATIC = Path(__file__).resolve().parent / "static"
 # A server limit, not an analysis threshold. Analysing and rendering a 29 s clip took 51 s,
 # so 60 s of video means a wait of nearly two minutes; a set of 10 push-ups lasts ~30 s.
 MAX_DURATION_S = 60
+# Bytes, against filling the disk. 30 s of 1080p phone video is ~34 MB; a minute of 4K is up to
+# ~450 MB, so 500 MB refuses nothing the duration limit would accept.
+MAX_UPLOAD_MB = 500
 VIDEO_ID = re.compile(r"[0-9a-f]{32}")  # the form of uuid4().hex
 NO_REPS_HINT = (
     "No push-ups found. Film from the side with your whole body in the frame, and start "
@@ -61,7 +65,38 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+class LimitUploadSize:
+    """Refuse a request body over max_bytes before any of it is read.
+
+    FastAPI reads a whole upload to a temporary file before the endpoint runs, so a size check
+    in the endpoint comes after the bytes are already on disk. This middleware sees each request
+    first and reads its declared size, the Content-Length header. uvicorn never passes on more
+    body than that header declared, so it can't understate. A body without one is refused too:
+    browsers always send it with a file.
+
+    Middleware runs on the event loop, so it is `async def`; it only reads a header, nothing slow.
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["method"] in ("POST", "PUT", "PATCH"):
+            declared = dict(scope["headers"]).get(b"content-length")
+            if declared is None or int(declared) > self.max_bytes:
+                size = f"{self.max_bytes // 1024**2} MB"
+                refusal = JSONResponse(
+                    status_code=413 if declared else 411,
+                    content={"detail": f"Uploads must be under {size}."},
+                )
+                await refusal(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(title="Form Coach", lifespan=lifespan)
+app.add_middleware(LimitUploadSize, max_bytes=MAX_UPLOAD_MB * 1024**2)
 # Read once at startup, so a broken config stops the server instead of failing every upload.
 RULES = load_rules(CONFIG)
 TITLES = {rule.name: rule.title for rule in RULES}
@@ -99,17 +134,28 @@ def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
     # upload's landmark cache (cached by file name) or point outside UPLOADS. OpenCV reads the
     # format from the file's contents, so a .mov saved as .mp4 still opens.
     path = UPLOADS / f"{video_id}.mp4"
+    annotated = UPLOADS / f"{video_id}_annotated.mp4"
     UPLOADS.mkdir(parents=True, exist_ok=True)
     with path.open("wb") as saved:
         shutil.copyfileobj(video.file, saved)
 
-    info = probe_video(path)  # milliseconds, where MediaPipe takes as long as the video
-    if info.n_frames / info.fps > MAX_DURATION_S:
-        raise HTTPException(413, f"Videos must be under {MAX_DURATION_S} seconds.")
-
-    result = analyze(path, CONFIG)
-    with h264_writer(UPLOADS / f"{video_id}_annotated.mp4", result.video) as write:
-        starts = annotate(result, TITLES, write)
+    try:
+        info = probe_video(path)  # milliseconds, where MediaPipe takes as long as the video
+        if info.n_frames / info.fps > MAX_DURATION_S:
+            raise HTTPException(413, f"Videos must be under {MAX_DURATION_S} seconds.")
+        result = analyze(path, CONFIG)
+        with h264_writer(annotated, result.video) as write:
+            starts = annotate(result, TITLES, write)
+    except Exception:
+        # refused or failed: nothing of this upload is kept
+        annotated.unlink(missing_ok=True)
+        cache_path(video_id).unlink(missing_ok=True)
+        raise
+    finally:
+        # The original is read only while drawing the annotated video. History keeps the
+        # measurements, the annotated video and the landmark cache, so it's never needed again,
+        # and a video of someone's body shouldn't sit on disk for no reason.
+        path.unlink(missing_ok=True)
 
     session_id = None
     if result.reps:  # no reps is a filming problem, not a session worth tracking

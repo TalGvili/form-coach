@@ -12,6 +12,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app import main
@@ -193,3 +194,50 @@ def test_an_upload_uses_the_profiles_stored_spelling(client: TestClient):
     upload(client, profile="TAL")
     assert client.get("/profiles").json() == ["Tal"]
     assert len(client.get("/sessions", params={"profile": "Tal"}).json()) == 1
+
+
+def test_a_body_over_the_limit_is_refused_before_it_is_read():
+    """On a tiny app with a 10-byte limit, so the test sends 11 bytes, not 500 MB."""
+    inner = FastAPI()
+
+    @inner.post("/upload")
+    def receive() -> dict[str, bool]:
+        return {"read": True}
+
+    client = TestClient(main.LimitUploadSize(inner, max_bytes=10))
+    assert client.post("/upload", content=b"x" * 10).json() == {"read": True}
+    refused = client.post("/upload", content=b"x" * 11)
+    assert refused.status_code == 413
+    assert refused.json()["detail"].startswith("Uploads must be under")
+
+
+def test_the_original_upload_is_deleted_and_the_annotated_video_kept(
+    client: TestClient, tmp_path: Path
+):
+    video_id = upload(client).json()["id"]
+    assert not (tmp_path / f"{video_id}.mp4").exists()
+    assert (tmp_path / f"{video_id}_annotated.mp4").exists()
+
+
+def test_a_refused_upload_leaves_no_files(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    def single_rep(path, config):
+        raise SingleRepError("Only one rep found.")
+
+    monkeypatch.setattr(main, "analyze", single_rep)
+    assert upload(client).status_code == 422
+    assert [f.name for f in tmp_path.iterdir()] == []  # no video, no history database
+
+
+def test_a_render_that_fails_halfway_leaves_no_files(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    def broken(result, titles, write):
+        write(b"half a video")
+        raise RuntimeError("ffmpeg died")
+
+    monkeypatch.setattr(main, "annotate", broken)
+    with pytest.raises(RuntimeError):
+        upload(client)
+    assert list(tmp_path.glob("*.mp4")) == []

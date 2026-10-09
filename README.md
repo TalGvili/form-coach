@@ -47,8 +47,11 @@ uvicorn app.main:app --host 0.0.0.0
 ```
 
 `--host 0.0.0.0` lets other devices on the same Wi-Fi connect: on a phone, open
-`http://<your computer's local IP>:8000`, and the upload button offers the camera. Videos must
-be under a minute; analysing a 30-second set takes about a minute.
+`http://<your computer's local IP>:8000`, and the upload button offers the camera. Only do that on
+a network you trust: profiles aren't accounts, so anyone who can reach the server can see every
+profile's history. Videos must be under a minute and 500 MB; analysing a 30-second set takes
+about a minute. The uploaded video is deleted once it's analysed: only the annotated copy and
+the pose landmarks are kept.
 
 The page shows a summary of the set, the annotated video (it pauses on each rep with something
 to fix), a table with one row per rep whose rep number plays the video from that rep, and a

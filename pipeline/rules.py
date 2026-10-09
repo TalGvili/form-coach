@@ -34,6 +34,7 @@ class Rule:
     duration_metric: str | None = None
     min_duration_s: float | None = None
     suppressed_by: tuple[str, ...] = ()  # rules whose fault on the same rep hides this one
+    chart: str | None = None  # a per-rep chart of the metric on the web page, with this caption
 
 
 def load_rules(path: Path) -> list[Rule]:
@@ -64,6 +65,9 @@ def load_rules(path: Path) -> list[Rule]:
             raise ValueError(f"rule {rule.name!r}: needs min, max or both")
         if (rule.duration_metric is None) != (rule.min_duration_s is None):
             raise ValueError(f"rule {rule.name!r}: duration_metric and min_duration_s go together")
+        if rule.chart and rule.duration_metric:
+            # a bar past the line that didn't last long enough would look like a missed fault
+            raise ValueError(f"rule {rule.name!r}: a chart can't show a duration condition")
     return rules
 
 

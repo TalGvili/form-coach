@@ -163,6 +163,17 @@ class TestLoadRules:
                 },
                 "can't be suppressed by",
             ),
+            (
+                {
+                    "metric": "max_hip_drop",
+                    "max": 15,
+                    "duration_metric": "hip_sag_duration_s",
+                    "min_duration_s": 0.2,
+                    "chart": "c",
+                    "message": "m",
+                },
+                "can't show a duration",
+            ),
         ],
     )
     def test_a_broken_rule_fails_at_load_time(self, tmp_path: Path, spec: dict, complaint: str):

@@ -19,11 +19,14 @@ The pauses make the annotated video longer than the original: about PAUSE_S per 
 plus the opening card. Anything synced to video time later (a chart, "jump to rep") must use
 the original's.
 
-The output uses OpenCV's mp4v codec, which video players handle but browsers don't; the web
-app re-encodes it to H.264 with ffmpeg.
+annotate() draws the frames and hands each one to a write function, so the caller decides
+where they go. render() writes them to a file with OpenCV's mp4v codec, which video players
+handle but browsers don't; the web app pipes them into ffmpeg as H.264 instead, encoding
+each frame once.
 """
 
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
 import cv2
@@ -49,15 +52,41 @@ CARD_ADVICE = [
 
 
 def render(result: SessionResult, titles: dict[str, str], out: Path) -> None:
-    """Write the annotated copy of result.video to out. titles: rule name -> what a user
-    calls the check ("no_lockout" -> "Arm lockout")."""
+    """Write the annotated video to an mp4v file: for the command line, which needs no
+    ffmpeg. titles: rule name -> what a user calls the check ("no_lockout" -> "Arm lockout")."""
+    video = result.video
+    size = (video.width, video.height)
+    writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*"mp4v"), video.fps, size)
+    try:
+        annotate(result, titles, writer.write)
+    finally:
+        writer.release()
+
+
+def annotate(
+    result: SessionResult, titles: dict[str, str], write: Callable[[np.ndarray], object]
+) -> dict[int, float]:
+    """Draw every frame of the annotated video, in order, and pass each to write: one call
+    per frame of the video, so a pause is the same frame written PAUSE_S * fps times.
+
+    Returns where each rep starts in the annotated video, in seconds, by rep index. The
+    opening card and the pauses push every rep later than in the original, so a page that
+    jumps to a rep needs these times. They are counted from the frames actually written,
+    so they can't drift from the video."""
     info, landmarks = load_or_extract(result.video.path)  # a cache hit after analyze()
     side = signals.pick_side(landmarks)
     capture = cv2.VideoCapture(info.path)
-    size = (info.width, info.height)
-    writer = cv2.VideoWriter(str(out), cv2.VideoWriter_fourcc(*"mp4v"), info.fps, size)
     pauses = _pauses(result.faults)
     unchecked = _unchecked_summary(result, titles)
+    rep_starting_at = {rep.start_frame: rep.index for rep in result.reps}
+    starts: dict[int, float] = {}
+    written = 0
+
+    def emit(frame: np.ndarray) -> None:
+        nonlocal written  # the counter lives in annotate, not in this inner function
+        write(frame)
+        written += 1
+
     try:
         for frame_index in range(len(landmarks)):
             ok, frame = capture.read()
@@ -72,13 +101,15 @@ def render(result: SessionResult, titles: dict[str, str], out: Path) -> None:
                 _draw_panel(card, lines, size=1.4, middle=True)
                 _draw_border(card, WARNING)
                 for _ in range(round(INTRO_S * info.fps)):
-                    writer.write(card)
+                    emit(card)
 
             current = _rep_at(result.reps, frame_index)
             playing = frame.copy()
             _draw_skeleton(playing, points, side, NEUTRAL)
             _draw_panel(playing, [(f"Rep {current.index}", NEUTRAL)] if current else [])
-            writer.write(playing)
+            if frame_index in rep_starting_at:
+                starts[rep_starting_at[frame_index]] = written / info.fps
+            emit(playing)
 
             if frame_index in pauses:
                 paused = frame.copy()
@@ -87,10 +118,10 @@ def render(result: SessionResult, titles: dict[str, str], out: Path) -> None:
                 _draw_panel(paused, messages)
                 _draw_border(paused, FAULT)
                 for _ in range(round(PAUSE_S * info.fps)):
-                    writer.write(paused)
+                    emit(paused)
     finally:
         capture.release()
-        writer.release()
+    return starts
 
 
 def _rep_at(reps: list[Rep], frame_index: int) -> Rep | None:

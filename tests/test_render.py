@@ -3,6 +3,10 @@ file; deciding what to show is pure logic and is tested here."""
 
 import dataclasses
 
+import numpy as np
+import pytest
+
+from pipeline import render
 from pipeline.models import Fault, Rep, SessionResult, Unevaluated, VideoInfo
 from pipeline.render import _pauses, _unchecked_summary
 
@@ -38,3 +42,36 @@ def test_unchecked_rules_are_summarised_once_per_rule_in_the_users_words():
     result = SessionResult(video, reps, [], unevaluated)
     titles = {"no_lockout": "Arm lockout", "shallow": "Depth"}
     assert _unchecked_summary(result, titles) == ["Arm lockout: 3 of 3 reps", "Depth: 1 of 3 reps"]
+
+
+def test_rep_start_times_count_the_opening_card_and_the_pauses(monkeypatch: pytest.MonkeyPatch):
+    """A 100-frame clip at 10 fps with two reps, a fault in rep 1 and an unchecked rule. The
+    video file and landmark cache are replaced by blank frames and landmarks."""
+    fps, n_frames = 10.0, 100
+
+    class BlankVideo:
+        def __init__(self, path):
+            self.left = n_frames
+
+        def read(self):
+            self.left -= 1
+            return self.left >= 0, np.zeros((36, 64, 3), dtype=np.uint8)
+
+        def release(self):
+            pass
+
+    video = VideoInfo(path="clip.mp4", fps=fps, width=64, height=36, n_frames=n_frames)
+    landmarks = np.full((n_frames, 33, 4), np.nan)
+    landmarks[:, :, 3] = 1.0  # visible but at no position: nothing is drawn
+    monkeypatch.setattr(render, "load_or_extract", lambda path: (video, landmarks))
+    monkeypatch.setattr(render.cv2, "VideoCapture", BlankVideo)
+
+    rep = Rep(1, 0, 20, 40, *[0.0] * 7, *[0] * 5)
+    reps = [rep, dataclasses.replace(rep, index=2, start_frame=40, bottom_frame=60, end_frame=80)]
+    result = SessionResult(video, reps, [SHALLOW], [Unevaluated(2, "no_lockout")])
+    frames = []
+    starts = render.annotate(result, {"no_lockout": "Arm lockout"}, frames.append)
+
+    card, pause = round(render.INTRO_S * fps), round(render.PAUSE_S * fps)  # 35 and 10 frames
+    assert len(frames) == card + n_frames + pause
+    assert starts == {1: card / fps, 2: (card + 40 + pause) / fps}  # rep 2 is after the pause

@@ -14,18 +14,20 @@ import re
 import shutil
 import subprocess
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from pipeline.errors import AnalysisError, NotAVideoError
 from pipeline.landmarks import probe_video
-from pipeline.render import render
+from pipeline.models import VideoInfo
+from pipeline.render import annotate
 from pipeline.rules import load_rules
 from pipeline.session import analyze, to_json
 
@@ -55,7 +57,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Form Coach", lifespan=lifespan)
 # Read once at startup, so a broken config stops the server instead of failing every upload.
-TITLES = {rule.name: rule.title for rule in load_rules(CONFIG)}
+RULES = load_rules(CONFIG)
+TITLES = {rule.name: rule.title for rule in RULES}
 
 
 @app.exception_handler(AnalysisError)
@@ -85,37 +88,54 @@ def analyze_upload(video: UploadFile) -> dict[str, Any]:
         raise HTTPException(413, f"Videos must be under {MAX_DURATION_S} seconds.")
 
     result = analyze(path, CONFIG)
-    raw = UPLOADS / f"{video_id}_raw.mp4"
-    render(result, TITLES, raw)
-    to_browser_video(raw, UPLOADS / f"{video_id}_annotated.mp4")
-    raw.unlink()
+    with h264_writer(UPLOADS / f"{video_id}_annotated.mp4", result.video) as write:
+        starts = annotate(result, TITLES, write)
 
     report = to_json(result)
     del report["video"]["path"]  # a path on this server, of no use to the user
+    for rep in report["reps"]:
+        # where the rep starts in the annotated video, which runs longer than the original
+        rep["video_start_s"] = starts.get(rep["index"])
     report["id"] = video_id
     report["video_url"] = f"/videos/{video_id}"
-    report["titles"] = TITLES
+    # what the page needs to label each check and draw its limit; the numbers stay in the YAML
+    report["rules"] = {
+        r.name: {"title": r.title, "metric": r.metric, "min": r.min, "max": r.max, "chart": r.chart}
+        for r in RULES
+    }
     report["hint"] = None if result.reps else NO_REPS_HINT
     return report
 
 
-def to_browser_video(raw: Path, out: Path) -> None:
-    """Re-encode OpenCV's mp4v output as H.264, the codec every browser plays.
+@contextmanager
+def h264_writer(out: Path, video: VideoInfo) -> Iterator[Callable[[np.ndarray], None]]:
+    """A write(frame) function that pipes frames into ffmpeg, which encodes them as H.264,
+    the codec every browser plays.
 
-    yuv420p is the pixel format browsers and phones expect; faststart moves the index to the
-    front of the file so playback starts before the download finishes; the scale caps the
-    height at 720 px, plenty on a phone (-2 keeps the proportions with an even width, which
-    H.264 needs). -an: the annotated video has no sound. check=True raises if ffmpeg fails.
+    Each frame is encoded once. Writing an mp4v file with OpenCV and re-encoding it took
+    35 s for a 21 s clip, 28 of them in OpenCV's encoder; piping takes 15 s for the same
+    file. The input options describe the raw frames (OpenCV's BGR pixels, size, frame rate);
+    "-i -" reads them from stdin.
 
-    Speed against size, measured on a 33 s annotated clip: the default (preset medium, crf 23)
-    took 22 s for 33 MB; veryfast with crf 26 takes 8 s for 17 MB, and the text on the
-    opening card looked the same in both.
+    Output: yuv420p is the pixel format browsers and phones expect; faststart moves the index
+    to the front so playback starts before the download finishes; the scale caps the height
+    at 720 px, plenty on a phone (-2 keeps the proportions with an even width, which H.264
+    needs); -an, no sound. veryfast with crf 26 encoded a 33 s annotated clip in 8 s at 17 MB,
+    against 22 s and 33 MB at the defaults, with the opening card's text looking the same.
     """
-    command = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(raw), "-c:v", "libx264"]
-    command += ["-preset", "veryfast", "-crf", "26"]
+    command = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24"]
+    command += ["-s", f"{video.width}x{video.height}", "-r", str(video.fps), "-i", "-"]
+    command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "26"]
     command += ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]
     command += ["-vf", "scale=-2:'min(720,ih)'", "-an", str(out)]
-    subprocess.run(command, check=True)
+    process = subprocess.Popen(command, stdin=subprocess.PIPE)
+    try:
+        yield lambda frame: process.stdin.write(frame.tobytes())
+    finally:
+        process.stdin.close()  # end of input: ffmpeg finishes the file and exits
+        returncode = process.wait()
+    if returncode != 0:
+        raise subprocess.CalledProcessError(returncode, command)
 
 
 @app.get("/videos/{video_id}")

@@ -79,6 +79,9 @@ rules:
     # is measured well, and 21 of 33 sag reps really are shallow too.
     suppressed_by: [hip_pike]
     message: "Not reaching full depth"
+    # The web page charts this metric per rep, with this caption (only for rules without a
+    # duration condition, which a chart of the value alone can't show).
+    chart: "How far above parallel the upper arm stayed at the bottom: lower is deeper."
 
   hip_sag:
     title: "Hip sag"

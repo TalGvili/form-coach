@@ -6,6 +6,7 @@ shape. The text-file test uses the real probe_video, since refusing a non-video 
 """
 
 import shutil
+from contextlib import contextmanager
 from pathlib import Path
 
 import cv2
@@ -30,8 +31,18 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(main, "UPLOADS", tmp_path)
     monkeypatch.setattr(main, "probe_video", lambda path: INFO)
     monkeypatch.setattr(main, "analyze", lambda path, config: SessionResult(INFO, [REP], [], []))
-    monkeypatch.setattr(main, "render", lambda result, titles, out: out.write_bytes(b"video"))
-    monkeypatch.setattr(main, "to_browser_video", lambda raw, out: shutil.copy(raw, out))
+
+    def fake_annotate(result, titles, write):
+        write(b"video")
+        return {1: 3.5}
+
+    monkeypatch.setattr(main, "annotate", fake_annotate)
+
+    @contextmanager
+    def file_writer(out, video):
+        yield out.write_bytes
+
+    monkeypatch.setattr(main, "h264_writer", file_writer)
     return TestClient(main.app)
 
 
@@ -47,6 +58,8 @@ def test_a_video_returns_the_report_and_a_link_to_the_annotated_video(client: Te
     assert report["reps"][0]["min_elbow_angle"] is None  # NaN became null: valid JSON
     assert "path" not in report["video"]  # the server's file layout stays private
     assert report["hint"] is None
+    assert report["reps"][0]["video_start_s"] == 3.5
+    assert report["rules"]["shallow"]["title"] == "Depth"
     video = client.get(report["video_url"])
     assert video.status_code == 200
     assert video.content == b"video"
@@ -99,15 +112,13 @@ def test_an_unknown_or_malformed_video_id_is_not_found(client: TestClient, video
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg is not installed")
-def test_the_annotated_video_is_re_encoded_as_h264(tmp_path: Path):
-    """The real ffmpeg on a tiny video in OpenCV's mp4v, which browsers can't play."""
-    raw, out = tmp_path / "raw.mp4", tmp_path / "out.mp4"
-    writer = cv2.VideoWriter(str(raw), cv2.VideoWriter_fourcc(*"mp4v"), 30.0, (320, 240))
-    for shade in range(0, 250, 25):
-        writer.write(np.full((240, 320, 3), shade, dtype=np.uint8))
-    writer.release()
-
-    main.to_browser_video(raw, out)
+def test_frames_are_piped_into_an_h264_video(tmp_path: Path):
+    """The real ffmpeg, fed ten small frames."""
+    out = tmp_path / "out.mp4"
+    video = VideoInfo("small.mp4", fps=30.0, width=320, height=240, n_frames=10)
+    with main.h264_writer(out, video) as write:
+        for shade in range(0, 250, 25):
+            write(np.full((240, 320, 3), shade, dtype=np.uint8))
 
     capture = cv2.VideoCapture(str(out))
     fourcc = int(capture.get(cv2.CAP_PROP_FOURCC)).to_bytes(4, "little").decode()

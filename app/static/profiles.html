@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Form Coach: who's training?</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="common.js"></script>
+</head>
+<body>
+<main class="landing">
+  <div class="logo large" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
+  </div>
+  <h1>Who's training?</h1>
+  <p class="lead">Pick your profile to analyse a set and see your progress.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <!-- A new profile: a name, sent to the server, which answers with the name to use -->
+  <form class="card add-form" id="add" hidden>
+    <label for="name">Your name</label>
+    <input id="name" maxlength="40" autocomplete="name" placeholder="e.g. Tal">
+    <div class="add-buttons">
+      <button type="submit" class="big">Continue</button>
+      <button type="button" class="change" id="cancel">Cancel</button>
+    </div>
+    <p class="error" id="add-error" hidden></p>
+  </form>
+
+  <p class="note fine-print">Profiles keep each person's history apart. They aren't accounts:
+    anyone using this server can open any profile.</p>
+</main>
+
+<script>
+  // Where to go once a profile is chosen: the page that sent the visitor here. Only a path on
+  // this site is followed, never a full address, so a crafted link can't send someone away.
+  const next = new URLSearchParams(location.search).get("next");
+  const destination = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+
+  function enter(name) {
+    if (!chooseProfile(name)) {
+      $("add-error").textContent = "This browser blocks site storage, so it can't remember " +
+        "your profile. Allow storage for this site and try again.";
+      $("add-error").hidden = false;
+      $("add").hidden = false;
+      return;
+    }
+    location.href = destination;
+  }
+
+  function tile(name) {
+    const button = el("button", "tile");
+    button.type = "button";
+    if (name === currentProfile()) button.classList.add("current");
+    button.append(avatar(name, "large"), el("span", "", name));
+    button.addEventListener("click", () => enter(name));
+    return button;
+  }
+
+  function addTile() {
+    const button = el("button", "tile add");
+    button.type = "button";
+    const plus = el("span", "avatar large add", "+");
+    plus.setAttribute("aria-hidden", "true");
+    button.append(plus, el("span", "", "Add profile"));
+    button.addEventListener("click", openAdd);
+    return button;
+  }
+
+  function openAdd() {
+    $("add").hidden = false;
+    $("name").focus();
+  }
+
+  $("cancel").addEventListener("click", () => { $("add").hidden = true; });
+
+  $("add").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = $("name").value.trim();
+    if (!name) {
+      $("add-error").textContent = "Type a name first.";
+      $("add-error").hidden = false;
+      return;
+    }
+    const body = new FormData();
+    body.append("profile", name);
+    const response = await fetch("/profiles", { method: "POST", body });
+    if (!response.ok) {
+      $("add-error").textContent = "That name can't be used. Try letters and numbers.";
+      $("add-error").hidden = false;
+      return;
+    }
+    enter((await response.json()).profile); // the stored spelling: "tal" may mean "Tal"
+  });
+
+  async function start() {
+    const names = await (await fetch("/profiles")).json();
+    $("tiles").replaceChildren(...names.map(tile), addTile());
+    if (names.length === 0) openAdd(); // the first visit: straight to typing a name
+  }
+  start();
+</script>
+</body>
+</html>

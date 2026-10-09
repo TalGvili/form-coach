@@ -68,8 +68,6 @@ h2::before {
 .nav:hover { filter: brightness(0.96); }
 
 /* history page */
-.picker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.picker label { font-weight: 600; }
 select {
   font: inherit; color: var(--ink); background: var(--page);
   border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
@@ -156,15 +154,6 @@ label.big:focus-within { outline: 3px solid var(--ink); outline-offset: 3px; }
 }
 .drop.compact svg, .drop.compact .or, .drop.compact .tips { display: none; }
 .drop.compact .big { padding: 10px 22px; font-size: 1rem; min-width: 0; box-shadow: none; }
-.who { margin: 0 0 20px; }
-.who label { display: block; font-weight: 600; margin-bottom: 6px; }
-.who input {
-  width: min(100%, 280px); padding: 12px 14px; text-align: center;
-  font: inherit; color: var(--ink); background: var(--page);
-  border: 1px solid var(--line); border-radius: 10px;
-}
-.who input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-.drop.compact .who { display: none; }
 .chosen { margin: 0 0 16px; font-weight: 600; overflow-wrap: anywhere; }
 .change {
   background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer;
@@ -219,3 +208,42 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .chart { position: relative; height: 260px; }
 .card > .note:last-child { margin-bottom: 0; }
+
+/* profiles: the header chip, avatars and the landing page */
+.topbar { display: flex; justify-content: flex-end; margin-bottom: 12px; min-height: 36px; }
+.me {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+}
+.me a { color: var(--accent); font-size: 0.9rem; font-weight: 600; text-decoration: none; }
+.me a::before { content: "·"; color: var(--muted); margin-right: 8px; }
+.avatar {
+  display: inline-grid; place-items: center; flex: none;
+  width: 28px; height: 28px; border-radius: 50%; color: #fff; font-weight: 700;
+}
+.avatar.large { width: 88px; height: 88px; font-size: 2.2rem; border-radius: 22px; }
+.avatar.add { background: none; color: var(--muted); border: 2px dashed var(--muted); }
+
+.landing { text-align: center; padding-top: 48px; }
+.logo.large { margin: 0 auto 16px; width: 56px; height: 56px; }
+.landing h1 { font-size: 2rem; }
+.tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin: 28px 0; }
+.tile {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; width: 112px;
+  background: none; border: 0; padding: 8px; border-radius: 16px; cursor: pointer;
+  font: inherit; color: var(--ink-2); transition: transform 0.12s;
+}
+.tile span:last-child { overflow-wrap: anywhere; }
+.tile:hover { transform: translateY(-2px); color: var(--ink); }
+.tile:hover .avatar { box-shadow: 0 0 0 3px var(--ink); }
+.tile:focus-visible { outline: 3px solid var(--accent); }
+.tile.current .avatar { box-shadow: 0 0 0 3px var(--accent); }
+.add-form { max-width: 360px; margin: 0 auto 24px; text-align: center; }
+.add-form label { display: block; font-weight: 600; margin-bottom: 8px; }
+.add-form input {
+  width: 100%; padding: 12px 14px; text-align: center; font: inherit; color: var(--ink);
+  background: var(--page); border: 1px solid var(--line); border-radius: 10px;
+}
+.add-buttons { margin-top: 14px; }
+.add-buttons .big { min-width: 0; padding: 12px 28px; font-size: 1rem; }
+.fine-print { max-width: 420px; margin: 0 auto; }

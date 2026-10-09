@@ -114,13 +114,15 @@ def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
     session_id = None
     if result.reps:  # no reps is a filming problem, not a session worth tracking
         with open_history() as db:
+            now = datetime.now(UTC)
             session_id = history.save_session(
                 db,
                 result,
-                profile=profile.strip(),
+                # the profile's stored spelling: "TAL" still goes into Tal's history
+                profile=history.add_profile(db, profile.strip(), now),
                 exercise=EXERCISE,
                 video_id=video_id,
-                created_at=datetime.now(UTC),
+                created_at=now,
                 video_starts=starts,
             )
     return report_for(result, video_id, starts, session_id)
@@ -128,9 +130,17 @@ def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
 
 @app.get("/profiles")
 def profiles() -> list[str]:
-    """Every name with a saved session."""
+    """Every profile, for the landing page's tiles."""
     with open_history() as db:
         return history.list_profiles(db)
+
+
+@app.post("/profiles")
+def add_profile(profile: Profile) -> dict[str, str]:
+    """Create a profile, or find the existing one with that name in any capitals; returns the
+    name to use from now on."""
+    with open_history() as db:
+        return {"profile": history.add_profile(db, profile.strip(), datetime.now(UTC))}
 
 
 @app.get("/sessions")

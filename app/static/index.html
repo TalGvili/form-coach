@@ -10,6 +10,7 @@
 </head>
 <body>
 <main>
+  <div class="topbar"><div class="me" id="me"></div></div>
   <div class="brand">
     <div class="logo" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
@@ -26,12 +27,6 @@
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>
     </svg>
-
-    <!-- Whose history the session is saved to: a name, remembered by this browser. -->
-    <div class="who">
-      <label for="profile">Who's training?</label>
-      <input id="profile" maxlength="40" autocomplete="name" placeholder="Your name">
-    </div>
 
     <!-- Step 1: pick a video. The label is the big button; clicking it opens the input inside.
          accept="video/*" makes a phone offer its camera as well as its files. -->
@@ -86,6 +81,10 @@
 </main>
 
 <script>
+  // No profile chosen yet: off to the landing page, which brings the visitor back here.
+  const profile = requireProfile();
+  showProfileChip(profile);
+
   let charts = [];
 
   // Picking a file, by the button or by dropping it, moves to the confirm step.
@@ -132,19 +131,9 @@
       .catch((error) => showStatus(error.message, "error"));
   }
 
-  // The name is remembered by this browser (localStorage), so a phone asks once. Storage can
-  // be blocked (private windows), so every access is allowed to fail.
-  try { $("profile").value = localStorage.getItem("profile") ?? ""; } catch {}
-
   $("upload").addEventListener("submit", async (event) => {
     event.preventDefault(); // stay on this page instead of the browser submitting the form
-    const name = $("profile").value.trim();
-    if (!name) {
-      showStatus("Enter your name first, so the session is saved to your history.", "error");
-      $("profile").focus();
-      return;
-    }
-    try { localStorage.setItem("profile", name); } catch {}
+    const name = profile; // chosen on the landing page; uploads go to its history
     const body = new FormData();
     body.append("video", $("file").files[0]); // the names the endpoint's parameters have
     body.append("profile", name);

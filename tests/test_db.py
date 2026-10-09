@@ -67,6 +67,19 @@ def test_each_profile_sees_only_its_own_sessions_oldest_first(db):
     assert store.list_profiles(db) == ["dana", "tal"]
 
 
+def test_a_profile_added_twice_in_other_capitals_is_one_profile(db):
+    assert store.add_profile(db, "Tal", MONDAY) == "Tal"
+    assert store.add_profile(db, "tal", MONDAY) == "Tal"  # the stored spelling wins
+    store.add_profile(db, "dana", MONDAY)
+    assert store.list_profiles(db) == ["dana", "Tal"]  # ignoring case: d before T
+
+
+def test_a_profile_with_no_sessions_is_still_listed(db):
+    store.add_profile(db, "Noa", MONDAY)
+    save(db, profile="tal")  # an older name, from a session only
+    assert store.list_profiles(db) == ["Noa", "tal"]
+
+
 def test_a_failed_save_leaves_nothing_behind(db):
     """Two reps with the same index break the reps table's key after the session row went
     in: the transaction must take that row back out."""

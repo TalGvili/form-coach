@@ -32,6 +32,10 @@ SQL_TYPES = {int: "INTEGER", float: "REAL"}
 REP_COLUMNS = ", ".join(f'"{f.name}"' for f in REP_FIELDS)
 
 SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS profiles (
+    name       TEXT PRIMARY KEY COLLATE NOCASE,  -- "tal" and "Tal" are the same person
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS sessions (
     id         INTEGER PRIMARY KEY,
     created_at TEXT NOT NULL,          -- ISO 8601, UTC
@@ -140,9 +144,24 @@ def list_sessions(db: sqlite3.Connection, profile: str) -> list[Session]:
     return [_session(row, *reps[row["id"]]) for row in rows]
 
 
+def add_profile(db: sqlite3.Connection, name: str, created_at: datetime) -> str:
+    """Create a profile unless one with that name exists, ignoring case; return the name as
+    stored, so "tal" typed later still means the existing "Tal"."""
+    with db:
+        db.execute(
+            "INSERT OR IGNORE INTO profiles (name, created_at) VALUES (?, ?)",
+            (name, created_at.isoformat(timespec="seconds")),
+        )
+    return db.execute("SELECT name FROM profiles WHERE name = ?", (name,)).fetchone()[0]
+
+
 def list_profiles(db: sqlite3.Connection) -> list[str]:
-    """Every name that has a session, alphabetically."""
-    return [row[0] for row in db.execute("SELECT DISTINCT profile FROM sessions ORDER BY 1")]
+    """Every profile, alphabetically: those added, and any name with sessions saved before
+    profiles had their own table."""
+    rows = db.execute(
+        "SELECT name FROM profiles UNION SELECT profile FROM sessions ORDER BY 1 COLLATE NOCASE"
+    )
+    return [row[0] for row in rows]
 
 
 def _to_row(rep: Rep) -> tuple:

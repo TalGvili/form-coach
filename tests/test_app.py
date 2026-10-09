@@ -179,3 +179,17 @@ def test_progress_has_one_entry_per_session_with_the_charted_metrics(client: Tes
     assert (first["reps"], first["to_fix"], first["clean_share"]) == (1, 1, 0.0)
     assert first["average"] == {"min_upper_arm_angle": 0.0}
     assert first["fatigue"] == {"min_upper_arm_angle": None}  # one rep has no thirds: null
+
+
+def test_adding_a_profile_returns_the_name_to_use(client: TestClient):
+    assert client.post("/profiles", data={"profile": " Tal "}).json() == {"profile": "Tal"}
+    assert client.post("/profiles", data={"profile": "TAL"}).json() == {"profile": "Tal"}
+    assert client.get("/profiles").json() == ["Tal"]
+    assert client.post("/profiles", data={"profile": "  "}).status_code == 422
+
+
+def test_an_upload_uses_the_profiles_stored_spelling(client: TestClient):
+    client.post("/profiles", data={"profile": "Tal"})
+    upload(client, profile="TAL")
+    assert client.get("/profiles").json() == ["Tal"]
+    assert len(client.get("/sessions", params={"profile": "Tal"}).json()) == 1

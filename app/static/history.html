@@ -10,6 +10,7 @@
 </head>
 <body>
 <main>
+  <div class="topbar"><div class="me" id="me"></div></div>
   <div class="brand">
     <div class="logo" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
@@ -19,11 +20,6 @@
     <a class="nav" href="/">← Analyse a video</a>
   </div>
   <p class="lead">Every session you've analysed, judged by today's rules.</p>
-
-  <div class="card picker">
-    <label for="who">Who's training?</label>
-    <select id="who"></select>
-  </div>
 
   <p class="card note" id="empty" hidden></p>
 
@@ -46,6 +42,10 @@
 </main>
 
 <script>
+  // No profile chosen yet: off to the landing page, which brings the visitor back here.
+  const profile = requireProfile();
+  showProfileChip(profile);
+
   let chart = null;
   let progress = null; // the last /progress response
 
@@ -169,7 +169,6 @@
   }
 
   async function load(profile) {
-    try { localStorage.setItem("profile", profile); } catch {}
     const response = await fetch(`/progress?profile=${encodeURIComponent(profile)}`);
     progress = await response.json();
     const choices = options(progress.metrics);
@@ -186,23 +185,17 @@
   }
 
   async function start() {
-    const names = await (await fetch("/profiles")).json();
-    if (names.length === 0) {
-      $("empty").textContent = "No sessions yet. Analyse a video first, and it appears here.";
+    await load(profile);
+    if (progress.sessions.length === 0) {
+      $("content").hidden = true;
+      $("empty").textContent = `No sessions yet for ${profile}. Analyse a video, and it ` +
+        "appears here.";
       $("empty").hidden = false;
-      document.querySelector(".picker").hidden = true;
-      return;
     }
-    let remembered = null;
-    try { remembered = localStorage.getItem("profile"); } catch {}
-    $("who").replaceChildren(...names.map((name) => el("option", "", name)));
-    $("who").value = names.includes(remembered) ? remembered : names[0];
-    load($("who").value);
   }
 
-  $("who").addEventListener("change", () => load($("who").value));
   $("metric").addEventListener("change", drawChart);
-  start();
+  if (profile) start();
 </script>
 </body>
 </html>

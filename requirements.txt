@@ -4,13 +4,16 @@ annotated-types==0.8.0
 anyio==4.15.1
 certifi==2026.7.22
 cffi==2.1.1
+charset-normalizer==3.5.2
 click==8.5.0
 colorama==0.4.6
 contourpy==1.4.0
+cryptography==50.0.2
 cycler==0.12.1
 fastapi==0.141.1
 flatbuffers==25.12.19
 fonttools==4.65.0
+google-auth==2.61.0
 h11==0.16.0
 httpcore2==2.13.1
 httpx2==2.13.1
@@ -25,6 +28,8 @@ packaging==26.3
 pandas==3.0.6
 pillow==12.3.0
 pluggy==1.6.0
+pyasn1==0.6.4
+pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.13.5
 pydantic_core==2.46.5
@@ -34,6 +39,7 @@ pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-multipart==0.0.32
 PyYAML==6.0.3
+requests==2.34.2
 ruff==0.16.8
 scipy==1.18.1
 six==1.17.0
@@ -43,4 +49,5 @@ truststore==0.10.4
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 tzdata==2026.4
+urllib3==2.8.0
 uvicorn==0.53.0

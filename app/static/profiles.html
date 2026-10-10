@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Form Coach: who's training?</title>
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>  <!-- from the server: is Google sign-in on? -->
   <script src="common.js"></script>
 </head>
 <body>
@@ -14,9 +15,12 @@
          stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>
   </div>
   <h1>Who's training?</h1>
-  <p class="lead">Pick your profile to analyse a set and see your progress.</p>
+  <p class="lead" id="lead">Pick your profile to analyse a set and see your progress.</p>
 
   <div class="tiles" id="tiles"></div>
+
+  <!-- With sign-in on: Google's own button, drawn by Google's script -->
+  <div class="google-button" id="google" hidden></div>
 
   <!-- A new profile: a name, sent to the server, which answers with the name to use -->
   <form class="card add-form" id="add" hidden>
@@ -29,7 +33,9 @@
     <p class="error" id="add-error" hidden></p>
   </form>
 
-  <p class="note fine-print">Profiles keep each person's history apart. They aren't accounts:
+  <p class="error" id="sign-in-error" hidden></p>
+
+  <p class="note fine-print" id="fine-print">Profiles keep each person's history apart. They aren't accounts:
     anyone using this server can open any profile.</p>
 </main>
 
@@ -101,7 +107,51 @@
     $("tiles").replaceChildren(...names.map(tile), addTile());
     if (names.length === 0) openAdd(); // the first visit: straight to typing a name
   }
-  start();
+
+  // Google's button hands its callback an ID token; the server checks it and sets the login
+  // cookie. JSON on purpose: the server refuses a form, which another site could post.
+  async function signedInWithGoogle(response) {
+    const reply = await fetch("/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+    if (!reply.ok) {
+      const data = await reply.json().catch(() => ({}));
+      $("sign-in-error").textContent = data.detail ?? "Sign-in didn't work. Try again.";
+      $("sign-in-error").hidden = false;
+      return;
+    }
+    location.href = destination;
+  }
+
+  async function startSignIn() {
+    if ((await fetch("/me")).ok) {
+      location.replace(destination); // already signed in
+      return;
+    }
+    $("lead").textContent = "Sign in to analyse a set and see your progress.";
+    $("fine-print").textContent = "Your sessions and videos are visible only to you.";
+    // Google's script, loaded only in this mode; it draws the button and runs the popup
+    const script = el("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.onload = () => {
+      google.accounts.id.initialize({
+        client_id: window.FORM_COACH.googleClientId,
+        callback: signedInWithGoogle,
+      });
+      const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+      google.accounts.id.renderButton($("google"), {
+        theme: dark ? "filled_black" : "outline", size: "large", shape: "pill", width: 280,
+        locale: "en", // the page is in English; Google would follow the browser's language
+      });
+      $("google").hidden = false;
+    };
+    document.head.append(script);
+  }
+
+  if (SIGN_IN) startSignIn();
+  else if (!DEMO) start();
 </script>
 </body>
 </html>

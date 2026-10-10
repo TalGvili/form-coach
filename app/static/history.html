@@ -6,6 +6,7 @@
   <title>Form Coach: progress</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>  <!-- from the server: is Google sign-in on? -->
   <script src="common.js"></script>
 </head>
 <body>
@@ -44,8 +45,7 @@
 
 <script>
   // No profile chosen yet: off to the landing page, which brings the visitor back here.
-  const profile = requireProfile();
-  showProfileChip(profile);
+  let profile = null; // whose history this is, once identify() has answered
   showDemoBanner("Eleven real sessions of one person from the project's dataset; the dates " +
     "are made up, three days apart.");
 
@@ -201,7 +201,12 @@
   }
 
   $("metric").addEventListener("change", drawChart);
-  if (profile) start();
+  identify().then((me) => {
+    if (!me) return;
+    profile = me.name;
+    showProfileChip(me.name);
+    start();
+  });
 </script>
 </body>
 </html>

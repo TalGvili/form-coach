@@ -20,5 +20,10 @@ for page in SITE.glob("*.html"):
     text = page.read_text(encoding="utf-8")
     if text.count('<html lang="en">') != 1:
         raise SystemExit(f'{page.name}: expected one <html lang="en"> tag to mark as demo')
-    page.write_text(text.replace('<html lang="en">', '<html lang="en" data-demo>'), "utf-8")
+    text = text.replace('<html lang="en">', '<html lang="en" data-demo>')
+    # config.js comes from the app's server, which the static site doesn't have
+    text = text.replace(
+        '  <script src="config.js"></script>  <!-- from the server: is Google sign-in on? -->\n', ""
+    )
+    page.write_text(text, "utf-8")
 print(f"built {SITE.relative_to(ROOT)}: {sorted(p.name for p in SITE.iterdir())}")

@@ -14,6 +14,8 @@ dependencies = [
     "fastapi",          # web API
     "uvicorn",          # ASGI server for FastAPI
     "python-multipart", # file uploads
+    "google-auth",      # checks Google sign-in tokens
+    "requests",         # how google-auth fetches Google's public keys
 ]
 
 [dependency-groups]

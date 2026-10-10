@@ -6,6 +6,7 @@
   <title>Form Coach</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="style.css">
+  <script src="config.js"></script>  <!-- from the server: is Google sign-in on? -->
   <script src="common.js"></script>
 </head>
 <body>
@@ -83,8 +84,12 @@
 
 <script>
   // No profile chosen yet: off to the landing page, which brings the visitor back here.
-  const profile = requireProfile();
-  showProfileChip(profile);
+  let profile = null; // whose page this is, once identify() has answered
+  identify().then((me) => {
+    if (!me) return;
+    profile = me.name;
+    showProfileChip(me.name);
+  });
   showDemoBanner("A real analysis of a set from the project's dataset, recorded in advance.");
 
   let charts = [];
@@ -144,7 +149,8 @@
     const name = profile; // chosen on the landing page; uploads go to its history
     const body = new FormData();
     body.append("video", $("file").files[0]); // the names the endpoint's parameters have
-    body.append("profile", name);
+    // local mode names the profile; with sign-in, the server goes by the login cookie alone
+    if (!SIGN_IN) body.append("profile", name);
 
     $("send").disabled = true;
     $("change").hidden = true;

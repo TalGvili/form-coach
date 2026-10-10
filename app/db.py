@@ -13,8 +13,11 @@ Each rep also keeps video_start_s, where it starts in the annotated video. That 
 the rendered file, not a verdict. The file itself shows the verdicts of the day it was made:
 if the thresholds change later, its pauses keep the old ones while the report shows the new.
 
-A profile is a name, not an account: it keeps one person's sessions apart from another's,
-it doesn't prove who anyone is.
+Every session and upload has an owner, a string: in local mode a profile name (a name, not an
+account: it keeps people's sessions apart, it doesn't prove who anyone is); with Google sign-in,
+"google:<sub>" for the signed-in user (User.owner). The history code doesn't care which.
+
+Login tokens are stored as SHA-256 hashes (app/auth.py says why), with an expiry.
 """
 
 import math
@@ -32,6 +35,24 @@ SQL_TYPES = {int: "INTEGER", float: "REAL"}
 REP_COLUMNS = ", ".join(f'"{f.name}"' for f in REP_FIELDS)
 
 SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS users (
+    id         INTEGER PRIMARY KEY,
+    google_sub TEXT NOT NULL UNIQUE,   -- Google's permanent id for the account
+    email      TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS logins (
+    token_hash TEXT PRIMARY KEY,       -- SHA-256 of the cookie's token, never the token itself
+    user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS videos (
+    video_id   TEXT PRIMARY KEY,       -- every annotated video, saved session or not
+    owner      TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS profiles (
     name       TEXT PRIMARY KEY COLLATE NOCASE,  -- "tal" and "Tal" are the same person
     created_at TEXT NOT NULL
@@ -162,6 +183,74 @@ def list_profiles(db: sqlite3.Connection) -> list[str]:
         "SELECT name FROM profiles UNION SELECT profile FROM sessions ORDER BY 1 COLLATE NOCASE"
     )
     return [row[0] for row in rows]
+
+
+@dataclass(frozen=True)
+class User:
+    """Someone signed in with Google."""
+
+    id: int
+    google_sub: str
+    email: str
+    name: str
+
+    @property
+    def owner(self) -> str:
+        """What their sessions and videos are stored under."""
+        return f"google:{self.google_sub}"
+
+
+def upsert_user(db: sqlite3.Connection, sub: str, email: str, name: str, now: datetime) -> User:
+    """The user with this Google id, created on their first sign-in. Email and name are
+    refreshed every time, since they can change on Google's side; the id can't."""
+    with db:
+        db.execute(
+            "INSERT INTO users (google_sub, email, name, created_at) VALUES (?, ?, ?, ?)"
+            " ON CONFLICT (google_sub) DO UPDATE SET email = excluded.email, name = excluded.name",
+            (sub, email, name, now.isoformat(timespec="seconds")),
+        )
+    row = db.execute("SELECT * FROM users WHERE google_sub = ?", (sub,)).fetchone()
+    return User(row["id"], row["google_sub"], row["email"], row["name"])
+
+
+def start_login(
+    db: sqlite3.Connection, user: User, token_hash: str, now: datetime, expires: datetime
+) -> None:
+    with db:
+        db.execute(
+            "INSERT INTO logins (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+            (token_hash, user.id, now.isoformat(), expires.isoformat()),
+        )
+
+
+def user_for_login(db: sqlite3.Connection, token_hash: str, now: datetime) -> User | None:
+    """The user a login token belongs to, or None if it's unknown, ended or expired."""
+    row = db.execute(
+        "SELECT users.* FROM logins JOIN users ON users.id = logins.user_id"
+        " WHERE logins.token_hash = ? AND logins.expires_at > ?",
+        (token_hash, now.isoformat()),
+    ).fetchone()
+    return None if row is None else User(row["id"], row["google_sub"], row["email"], row["name"])
+
+
+def end_login(db: sqlite3.Connection, token_hash: str) -> None:
+    """Sign out: the token stops working at once, whatever the cookie's own expiry says."""
+    with db:
+        db.execute("DELETE FROM logins WHERE token_hash = ?", (token_hash,))
+
+
+def add_video(db: sqlite3.Connection, video_id: str, owner: str, now: datetime) -> None:
+    """Record who an annotated video belongs to, so only they can fetch it."""
+    with db:
+        db.execute(
+            "INSERT INTO videos (video_id, owner, created_at) VALUES (?, ?, ?)",
+            (video_id, owner, now.isoformat(timespec="seconds")),
+        )
+
+
+def video_owner(db: sqlite3.Connection, video_id: str) -> str | None:
+    row = db.execute("SELECT owner FROM videos WHERE video_id = ?", (video_id,)).fetchone()
+    return None if row is None else row["owner"]
 
 
 def _to_row(rep: Rep) -> tuple:

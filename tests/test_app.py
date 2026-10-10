@@ -162,7 +162,7 @@ def test_a_stored_session_is_judged_by_the_current_rules(client: TestClient):
 def test_a_video_without_reps_is_not_saved(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(main, "analyze", lambda path, config: SessionResult(INFO, [], [], []))
     assert upload(client).json()["session_id"] is None
-    assert client.get("/profiles").json() == []
+    assert client.get("/sessions", params={"profile": "tal"}).json() == []
 
 
 def test_an_unknown_session_is_not_found(client: TestClient):

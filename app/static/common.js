@@ -8,6 +8,10 @@ const $ = (id) => document.getElementById(id);
 const DEMO = document.documentElement.hasAttribute("data-demo");
 const DEMO_PROFILE = "Demo";
 
+// Google sign-in is on when the server's config.js gave a client id. Otherwise the app is in
+// local mode, with profiles that are names, not accounts.
+const SIGN_IN = !DEMO && Boolean(window.FORM_COACH?.googleClientId);
+
 // Builds an element with its text set through textContent, never innerHTML: text is shown
 // as text, so nothing in a response can be run as HTML.
 function el(tag, className = "", text = "") {
@@ -46,16 +50,21 @@ function chooseProfile(name) {
   try { localStorage.setItem("profile", name); return true; } catch { return false; }
 }
 
-// Pages that work on a profile send a visitor without one to the landing page, which sends
-// them back here once they've picked.
-function requireProfile() {
-  if (DEMO) return DEMO_PROFILE;
-  const name = currentProfile();
-  if (!name) {
-    const here = location.pathname + location.search;
-    location.replace(`profiles.html?next=${encodeURIComponent(here)}`);
+// Who the page works for, as { name }, or null after sending the visitor to the landing page
+// (which sends them back here). With sign-in on, the server says: the login cookie is HttpOnly,
+// so no script, ours included, can read it. In local mode, the profile this browser remembers.
+async function identify() {
+  if (DEMO) return { name: DEMO_PROFILE };
+  if (SIGN_IN) {
+    const response = await fetch("/me");
+    if (response.ok) return await response.json();
+  } else {
+    const name = currentProfile();
+    if (name) return { name };
   }
-  return name;
+  const here = location.pathname + location.search;
+  location.replace(`profiles.html?next=${encodeURIComponent(here)}`);
+  return null;
 }
 
 // A circle with the name's first letter, in a colour that is always the same for that name.
@@ -69,14 +78,21 @@ function avatar(name, size = "") {
   return circle;
 }
 
-// The header's "who am I" chip: the avatar, the name, and a way to switch.
+// The header's "who am I" chip: the avatar, the name, and Switch (local mode) or Sign out.
 function showProfileChip(name) {
   const chip = $("me");
   if (!chip || !name) return;
   chip.replaceChildren(avatar(name), el("strong", "", name));
   if (DEMO) return; // nothing to switch to
-  const change = el("a", "", "Switch");
+  const change = el("a", "", SIGN_IN ? "Sign out" : "Switch");
   change.href = "profiles.html";
+  if (SIGN_IN) {
+    change.addEventListener("click", async (event) => {
+      event.preventDefault();
+      await fetch("/auth/logout", { method: "POST" }); // ends the login on the server
+      location.href = "profiles.html";
+    });
+  }
   chip.append(change);
 }
 

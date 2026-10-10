@@ -2,6 +2,11 @@
 
 No analysis logic here - this layer only calls into `pipeline` and shapes HTTP responses.
 
+Two modes. With GOOGLE_CLIENT_ID set, people sign in with Google (app/auth.py) and every request
+works on the signed-in user's own data. Without it, the app runs as a local, single-computer app
+whose profiles are names, not accounts. owner_of() is the one place that decides whose data a
+request is about.
+
     uvicorn app.main:app --reload --host 0.0.0.0
 
 The endpoints are plain `def`, not `async def`. FastAPI runs a plain def in a pool of worker
@@ -10,6 +15,8 @@ while the server keeps answering other requests. An async def runs on the event 
 the one thread that serves every request, and slow code there would freeze them all.
 """
 
+import json
+import os
 import re
 import shutil
 import sqlite3
@@ -17,18 +24,20 @@ import subprocess
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import asynccontextmanager, closing, contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
 
 import numpy as np
 import yaml
-from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app import db as history
+from app.auth import SignInError, new_login_token, token_hash, verify_google_token
 from pipeline.errors import AnalysisError, NotAVideoError
 from pipeline.landmarks import cache_path, probe_video
 from pipeline.models import SessionResult, VideoInfo
@@ -42,6 +51,27 @@ CONFIG = ROOT / "configs" / "pushup.yaml"
 UPLOADS = ROOT / "data" / "uploads"
 DB_PATH = ROOT / "data" / "history.db"
 STATIC = Path(__file__).resolve().parent / "static"
+
+# Sign in with Google, on when the client id is set (it isn't a secret: it's in every page).
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or None
+
+
+def allowed_emails(setting: str) -> set[str] | None:
+    """Who may sign in, from ALLOWED_EMAILS: a comma-separated list, or "*" for any Google
+    account (None). Deny by default: an empty setting allows nobody, and the server refuses to
+    start that way, so letting every Google account in is always a written-out choice.
+
+    Google's own test-user list for an app in Testing mode doesn't stop this kind of sign-in
+    (only name and email, no access to Google services): a test showed another account getting
+    in. This list, checked by this server, is the control."""
+    if setting.strip() == "*":
+        return None
+    return {email.strip().lower() for email in setting.split(",") if email.strip()}
+
+
+ALLOWED_EMAILS = allowed_emails(os.environ.get("ALLOWED_EMAILS", ""))
+LOGIN_COOKIE = "form_coach_login"
+LOGIN_DAYS = 30
 
 # A server limit, not an analysis threshold. Analysing and rendering a 29 s clip took 51 s,
 # so 60 s of video means a wait of nearly two minutes; a set of 10 push-ups lasts ~30 s.
@@ -62,6 +92,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     minute of analysis, so refuse to start instead."""
     if shutil.which("ffmpeg") is None:
         raise RuntimeError("ffmpeg not found on PATH; it re-encodes videos for the browser.")
+    if GOOGLE_CLIENT_ID and ALLOWED_EMAILS == set():
+        raise RuntimeError(
+            "Google sign-in is on but nobody may sign in: set ALLOWED_EMAILS to the emails that "
+            "may (comma-separated), or ALLOWED_EMAILS=* to allow any Google account."
+        )
     yield
 
 
@@ -104,15 +139,47 @@ EXERCISE = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))["exercise"]
 # Progress per metric covers the rules the page charts, so no metric is named in code.
 CHARTED = {rule.metric: rule.title for rule in RULES if rule.chart}
 
-# Who a session belongs to: a name, not an account (see app/db.py). At least one visible
-# character, so "   " can't become a profile.
-Profile = Annotated[str, Form(min_length=1, max_length=40, pattern=r"\S")]
+# Local mode's profile, a name, not an account (see app/db.py): at least one visible character,
+# so "   " can't become one. Optional, because with Google sign-in the request doesn't choose.
+Profile = Annotated[str | None, Form(min_length=1, max_length=40, pattern=r"\S")]
 
 
 def open_history() -> closing[sqlite3.Connection]:
     """A connection for one request, closed when the `with` block ends. closing() is needed
     because a sqlite3 connection's own `with` commits a transaction but doesn't close it."""
     return closing(history.connect(DB_PATH))
+
+
+def signed_in_user(request: Request) -> history.User | None:
+    """The user whose login cookie this request carries, if it's valid and not expired."""
+    token = request.cookies.get(LOGIN_COOKIE)
+    if not token:
+        return None
+    with open_history() as db:
+        return history.user_for_login(db, token_hash(token), datetime.now(UTC))
+
+
+def owner_of(request: Request, profile: str | None = None) -> str:
+    """Whose data a request reads or writes: the one place that decides it.
+
+    With Google sign-in, always the signed-in user's, whatever the request names, so nobody can
+    ask for someone else's sessions by changing a parameter. Without it, the profile the request
+    names: local mode has no accounts to check against.
+    """
+    if GOOGLE_CLIENT_ID:
+        user = signed_in_user(request)
+        if user is None:
+            raise HTTPException(401, "Sign in first.")
+        return user.owner
+    if profile is None or not profile.strip():
+        raise HTTPException(422, "Choose a profile first.")
+    return profile.strip()
+
+
+def profiles_mode_only() -> None:
+    """Profiles are local mode's stand-in for accounts; with sign-in on they don't exist."""
+    if GOOGLE_CLIENT_ID:
+        raise HTTPException(404, "This server uses Google sign-in, not profiles.")
 
 
 @app.exception_handler(AnalysisError)
@@ -126,9 +193,10 @@ def refuse(request: Request, error: AnalysisError) -> JSONResponse:
 
 
 @app.post("/analyze")
-def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
+def analyze_upload(request: Request, video: UploadFile, profile: Profile = None) -> dict[str, Any]:
     """Save the upload, check it, analyse it, render the annotated video and save the session
-    to the profile's history; return the report."""
+    to its owner's history; return the report."""
+    owner = owner_of(request, profile)  # before any work: no sign-in, no analysis
     video_id = uuid.uuid4().hex
     # The file name is ours, never the uploader's: a random id can't collide with another
     # upload's landmark cache (cached by file name) or point outside UPLOADS. OpenCV reads the
@@ -158,14 +226,17 @@ def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
         path.unlink(missing_ok=True)
 
     session_id = None
-    if result.reps:  # no reps is a filming problem, not a session worth tracking
-        with open_history() as db:
-            now = datetime.now(UTC)
+    with open_history() as db:
+        now = datetime.now(UTC)
+        if not GOOGLE_CLIENT_ID:
+            # the profile's stored spelling: "TAL" still goes into Tal's history
+            owner = history.add_profile(db, owner, now)
+        history.add_video(db, video_id, owner, now)
+        if result.reps:  # no reps is a filming problem, not a session worth tracking
             session_id = history.save_session(
                 db,
                 result,
-                # the profile's stored spelling: "TAL" still goes into Tal's history
-                profile=history.add_profile(db, profile.strip(), now),
+                profile=owner,
                 exercise=EXERCISE,
                 video_id=video_id,
                 created_at=now,
@@ -174,26 +245,108 @@ def analyze_upload(video: UploadFile, profile: Profile) -> dict[str, Any]:
     return report_for(result, video_id, starts, session_id)
 
 
+class GoogleCredential(BaseModel):
+    """The body of POST /auth/google: the ID token Google's button gave the page."""
+
+    credential: str
+
+
+@app.post("/auth/google")
+def sign_in_with_google(
+    body: GoogleCredential, request: Request, response: Response
+) -> dict[str, str]:
+    """Check Google's ID token and start a login: a random token in a cookie.
+
+    The body must be JSON (FastAPI rejects a form with 422). Another website can't send JSON to
+    this server without the browser first asking this server's permission, which it never gives,
+    so no other page can sign a visitor in to an account of its choosing.
+    """
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(404, "Google sign-in isn't set up on this server.")
+    try:
+        identity = verify_google_token(body.credential, GOOGLE_CLIENT_ID)
+    except SignInError as error:
+        raise HTTPException(401, "Google sign-in didn't work. Try again.") from error
+    if ALLOWED_EMAILS is not None and (
+        not identity.email_verified or identity.email.lower() not in ALLOWED_EMAILS
+    ):
+        raise HTTPException(403, "This Google account isn't allowed on this server.")
+
+    now = datetime.now(UTC)
+    token = new_login_token()
+    with open_history() as db:
+        user = history.upsert_user(db, identity.sub, identity.email, identity.name, now)
+        history.start_login(db, user, token_hash(token), now, now + timedelta(days=LOGIN_DAYS))
+    # HttpOnly: the page's scripts can't read it, so injected script can't steal it. SameSite=Lax:
+    # the browser doesn't send it with another site's POST, so other sites can't act as the user.
+    # Secure over HTTPS: never sent unencrypted. (Plain-HTTP localhost has no HTTPS to require.)
+    response.set_cookie(
+        LOGIN_COOKIE,
+        token,
+        max_age=LOGIN_DAYS * 24 * 3600,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+    )
+    return {"name": user.name, "email": user.email}
+
+
+@app.get("/me")
+def me(request: Request) -> dict[str, str]:
+    """Who is signed in; 401 if nobody. The page asks on load, since it can't read the cookie."""
+    user = signed_in_user(request) if GOOGLE_CLIENT_ID else None
+    if user is None:
+        raise HTTPException(401, "Not signed in.")
+    return {"name": user.name, "email": user.email}
+
+
+@app.post("/auth/logout")
+def sign_out(request: Request, response: Response) -> dict[str, bool]:
+    """End the login on the server, so the token stops working even if a copy survives."""
+    token = request.cookies.get(LOGIN_COOKIE)
+    if token:
+        with open_history() as db:
+            history.end_login(db, token_hash(token))
+    response.delete_cookie(LOGIN_COOKIE)
+    return {"signed_out": True}
+
+
+@app.get("/config.js")
+def page_config() -> Response:
+    """Tells the pages, before their own scripts run, whether Google sign-in is on and with
+    which client id. A script rather than JSON, so a page knows its mode without waiting."""
+    config = {"googleClientId": GOOGLE_CLIENT_ID}
+    return Response(
+        f"window.FORM_COACH = {json.dumps(config)};\n",
+        media_type="text/javascript",
+        headers={"Cache-Control": "no-store"},  # a restart with sign-in turned on shows at once
+    )
+
+
 @app.get("/profiles")
 def profiles() -> list[str]:
     """Every profile, for the landing page's tiles."""
+    profiles_mode_only()
     with open_history() as db:
         return history.list_profiles(db)
 
 
 @app.post("/profiles")
-def add_profile(profile: Profile) -> dict[str, str]:
+def add_profile(request: Request, profile: Profile = None) -> dict[str, str]:
     """Create a profile, or find the existing one with that name in any capitals; returns the
     name to use from now on."""
+    profiles_mode_only()
+    name = owner_of(request, profile)
     with open_history() as db:
-        return {"profile": history.add_profile(db, profile.strip(), datetime.now(UTC))}
+        return {"profile": history.add_profile(db, name, datetime.now(UTC))}
 
 
 @app.get("/sessions")
-def sessions(profile: str) -> list[dict[str, Any]]:
-    """A profile's sessions, oldest first, each judged by the current rules."""
+def sessions(request: Request, profile: str | None = None) -> list[dict[str, Any]]:
+    """The owner's sessions, oldest first, each judged by the current rules."""
+    owner = owner_of(request, profile)
     with open_history() as db:
-        stored = history.list_sessions(db, profile)
+        stored = history.list_sessions(db, owner)
     summaries = []
     for session in stored:
         progress = session_progress(judged(session), [])
@@ -209,12 +362,13 @@ def sessions(profile: str) -> list[dict[str, Any]]:
 
 
 @app.get("/progress")
-def progress(profile: str) -> dict[str, Any]:
-    """The numbers behind the history page's chart: one entry per session of the profile,
+def progress(request: Request, profile: str | None = None) -> dict[str, Any]:
+    """The numbers behind the history page's chart: one entry per session of the owner,
     oldest first, each computed now from the stored measurements and the current rules.
     metrics: the per-metric fields' keys, with the titles to show them under."""
+    owner = owner_of(request, profile)
     with open_history() as db:
-        stored = history.list_sessions(db, profile)
+        stored = history.list_sessions(db, owner)
     return {
         "metrics": CHARTED,
         "sessions": [
@@ -229,12 +383,15 @@ def progress(profile: str) -> dict[str, Any]:
 
 
 @app.get("/sessions/{session_id}")
-def session_report(session_id: int) -> dict[str, Any]:
+def session_report(request: Request, session_id: int) -> dict[str, Any]:
     """A stored session's report, in the same shape as POST /analyze returns, with its
-    faults recomputed from the stored measurements and the current rules."""
+    faults recomputed from the stored measurements and the current rules.
+
+    With sign-in on, someone else's session is "no such session", not "forbidden": a different
+    answer would tell a stranger which ids exist."""
     with open_history() as db:
         session = history.get_session(db, session_id)
-    if session is None:
+    if session is None or (GOOGLE_CLIENT_ID and session.profile != owner_of(request)):
         raise HTTPException(404, "No such session.")
     report = report_for(judged(session), session.video_id, session.video_starts, session.id)
     report["created_at"] = session.created_at
@@ -309,12 +466,17 @@ def h264_writer(out: Path, video: VideoInfo) -> Iterator[Callable[[np.ndarray], 
 
 
 @app.get("/videos/{video_id}")
-def annotated_video(video_id: str) -> FileResponse:
+def annotated_video(request: Request, video_id: str) -> FileResponse:
     """The annotated video of one upload. The id must look like one this server issued, so a
-    request can't name a file of its own choosing, such as ../../configs/pushup.yaml."""
+    request can't name a file of its own choosing, such as ../../configs/pushup.yaml. With
+    sign-in on, it must also be the signed-in user's: 404 otherwise, as for sessions."""
     path = UPLOADS / f"{video_id}_annotated.mp4"
     if not VIDEO_ID.fullmatch(video_id) or not path.is_file():
         raise HTTPException(404, "No such video.")
+    if GOOGLE_CLIENT_ID:
+        with open_history() as db:
+            if history.video_owner(db, video_id) != owner_of(request):
+                raise HTTPException(404, "No such video.")
     return FileResponse(path, media_type="video/mp4")
 
 

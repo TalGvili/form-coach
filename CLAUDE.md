@@ -12,7 +12,7 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- Phase: 8 (Docker, README, polish). Phases 4-7 are done.
+- All eight phases are done. The demo is live at https://talgvili.github.io/form-coach/.
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
   `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
@@ -41,7 +41,12 @@ Full plan: @docs/form-coach-project-guide.md
   landing page, the chosen profile lives in the browser's localStorage. Endpoints: `/profiles`
   (GET, POST), `/sessions`, `/sessions/{id}`, `/progress`. Uploads: 500 MB limit in
   middleware, original deleted after analysis, nothing kept on refusal.
-- Next: Phase 8, Docker and the final README.
+- Phase 8: `Dockerfile` (python:3.12-slim, ffmpeg, libgl1/libglib2.0-0 for OpenCV,
+  libegl1/libgles2 for MediaPipe, the model downloaded with its SHA-256, non-root user, data/ as a
+  volume); CI builds it and loads MediaPipe's native library. The static demo is the app's pages
+  with `<html data-demo>` (`scripts/build_site.py`), reading `demo/` built locally by
+  `scripts/make_demo.py` from clip09; `.github/workflows/pages.yml` deploys it. Ruff enforces
+  type hints (`ANN`, tests exempt). The smoothing order is in the YAML.
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).

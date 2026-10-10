@@ -45,8 +45,12 @@ docker build -t form-coach .
 docker run -p 127.0.0.1:8000:8000 -v form-coach-data:/app/data form-coach
 ```
 
-Open `http://localhost:8000`, pick a profile, and upload a side-view video of a few push-ups
-(under a minute). The volume keeps your history across restarts. To use it from your phone on the
+The first start after a build can take a minute or two while Python loads its libraries; the
+server is ready when `docker logs` shows `Application startup complete`. Then open
+`http://localhost:8000`, pick a profile, and upload a side-view video of a few push-ups (under a
+minute). Analysis takes about as long as the video, or more on a busy machine: 37 s to 45 s for
+a 21-second clip in our tests, and nearly four minutes for a 30-second clip in Docker on Windows
+while the computer was busy with other work. The volume keeps your history across restarts. To use it from your phone on the
 same Wi-Fi, run with `-p 8000:8000` and open `http://<your computer's IP>:8000`, on a network you
 trust: profiles keep people's histories apart but aren't accounts.
 

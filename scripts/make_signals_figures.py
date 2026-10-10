@@ -29,6 +29,9 @@ BLUE_TINT = "#cde2fb"
 
 L = signals.LEFT
 
+# A 2D point as the drawing helpers take it: a tuple or a NumPy array of x, y.
+XY = tuple[float, float] | np.ndarray
+
 plt.switch_backend("Agg")
 plt.rcParams.update(
     {
@@ -71,14 +74,16 @@ def diagram(ax: plt.Axes, xlim: tuple[float, float], ylim: tuple[float, float]) 
     ax.axis("off")
 
 
-def point(ax: plt.Axes, xy, label: str = "", dx: float = 0, dy: float = 0, **text) -> None:
+def point(ax: plt.Axes, xy: XY, label: str = "", dx: float = 0, dy: float = 0, **text: str) -> None:
     """A joint: ink dot with a 2px surface ring, and an optional label beside it."""
     ax.plot(*xy, "o", ms=9, color=INK, mec=SURFACE, mew=2, zorder=6)
     if label:
         ax.text(xy[0] + dx, xy[1] + dy, label, color=INK_2, fontsize=10, **text)
 
 
-def arc(ax: plt.Axes, center, towards_a, towards_b, radius: float, color: str = INK_2) -> float:
+def arc(
+    ax: plt.Axes, center: XY, towards_a: XY, towards_b: XY, radius: float, color: str = INK_2
+) -> float:
     """Draw the smaller arc at center between two directions; return its middle angle."""
     a1 = np.arctan2(towards_a[1], towards_a[0])
     a2 = np.arctan2(towards_b[1], towards_b[0])
@@ -94,7 +99,7 @@ def arc(ax: plt.Axes, center, towards_a, towards_b, radius: float, color: str = 
     return a1 + sweep / 2
 
 
-def at_angle(center, phi: float, radius: float) -> tuple[float, float]:
+def at_angle(center: XY, phi: float, radius: float) -> tuple[float, float]:
     return center[0] + radius * np.cos(phi), center[1] + radius * np.sin(phi)
 
 
@@ -593,13 +598,21 @@ def fig_runs() -> None:
     ax.set_ylim(-6.3, 1.3)
     ax.axis("off")
 
-    def cell(col, row, text, fill=SURFACE, edge=AXIS, lw=1.0, ls="-"):
+    def cell(
+        col: float,
+        row: float,
+        text: str,
+        fill: str = SURFACE,
+        edge: str = AXIS,
+        lw: float = 1.0,
+        ls: str = "-",
+    ) -> None:
         ax.add_patch(
             Rectangle((col - 0.44, row - 0.38), 0.88, 0.76, fc=fill, ec=edge, lw=lw, ls=ls)
         )
         ax.text(col, row, text, ha="center", va="center", fontsize=11, color=INK)
 
-    def row_label(row, text):
+    def row_label(row: float, text: str) -> None:
         ax.text(-1.75, row, text, ha="right", va="center", fontsize=10.5, color=INK_2)
 
     for col in range(len(mask)):
@@ -758,7 +771,7 @@ def fig_smooth() -> dict[str, float]:
     t = np.arange(12 * fps) / fps
     clean = 88 - 83 * np.exp(-((((t % 2) - 1) / 0.22) ** 2))  # push-up-like depth signal
     noisy = clean + np.random.default_rng(0).normal(0, 3, t.size)
-    smoothed = signals.smooth(noisy, fps=fps, window_s=0.4)
+    smoothed = signals.smooth(noisy, fps=fps, window_s=0.4, polyorder=2)
     window = int(fps * 0.4) | 1
     moving = np.convolve(noisy, np.ones(window) / window, mode="same")
 
@@ -813,7 +826,7 @@ def fig_smooth() -> dict[str, float]:
     wave = 50 + 20 * np.sin(frames / 5)
     wave[20] = np.nan
     whole = savgol_filter(wave, window, 2)
-    per_run = signals.smooth(wave, fps=fps, window_s=0.4)
+    per_run = signals.smooth(wave, fps=fps, window_s=0.4, polyorder=2)
     ax_n.set_xlim(-1, 50)
     ax_n.set_ylim(-0.9, 1.7)
     ax_n.axis("off")

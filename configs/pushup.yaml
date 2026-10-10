@@ -21,6 +21,9 @@ segmentation:
   # It also lifts the bottom of narrow dips by a few degrees, so tune it together with the
   # shallow threshold, not separately.
   smoothing_window_s: 0.4
+  # The curve each Savitzky-Golay window fits. 2 (a parabola) follows a rep's rounded bottom;
+  # 1 would flatten it like a moving average. Not tuned: the window was.
+  smoothing_polyorder: 2
 
   # A dip counts as a rep bottom only if it spans this share of the clip's upper-arm range
   # (5th-95th percentile). Relative, so it works at any camera distance.

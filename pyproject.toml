@@ -20,7 +20,7 @@ dependencies = [
 dev = [
     "pytest",
     "ruff",
-    "httpx",            # FastAPI's TestClient sends requests through it
+    "httpx2",           # FastAPI's TestClient sends requests through it
 ]
 
 [tool.ruff]
@@ -36,10 +36,23 @@ select = [
     "I", # isort: import order
     "B", # bugbear: likely bugs
     "UP", # pyupgrade: modern syntax for the target version
+    "ANN", # type annotations on every function
 ]
+# Any is the honest type for the JSON conversion in pipeline/session.py (nested dicts, lists and
+# numbers of any shape), so it isn't banned.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest calls the tests, nothing else does: "-> None" on each adds nothing a reader needs.
+"tests/**" = ["ANN"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Put the repo root on the import path so tests can `import pipeline`. `python -m pytest`
 # does this by itself; plain `pytest` (which CI runs) does not.
 pythonpath = ["."]
+filterwarnings = [
+    # Raised inside Starlette 1.6's own test client (it uses an anyio alias anyio deprecated),
+    # not by this project's code. Remove once Starlette is upgraded past it.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning:starlette.testclient",
+]

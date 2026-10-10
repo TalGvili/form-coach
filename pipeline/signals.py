@@ -173,7 +173,7 @@ def interpolate_gaps(signal: np.ndarray, max_gap: int) -> np.ndarray:
     return filled
 
 
-def smooth(signal: np.ndarray, fps: float, window_s: float, polyorder: int = 2) -> np.ndarray:
+def smooth(signal: np.ndarray, fps: float, window_s: float, polyorder: int) -> np.ndarray:
     """Savitzky-Golay smoothing, applied to each run of valid values separately.
 
     Savgol keeps the shape of the dips better than a moving average, which matters

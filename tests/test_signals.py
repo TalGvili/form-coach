@@ -203,10 +203,10 @@ class TestSmooth:
         t = np.linspace(0, 16, 480)  # 16 s at 30 fps
         clean = 45 * np.cos(2 * np.pi * t / 2)
         noisy = clean + np.random.default_rng(0).normal(0, 3, t.size)
-        smoothed = signals.smooth(noisy, fps=30.0, window_s=0.4)
+        smoothed = signals.smooth(noisy, fps=30.0, window_s=0.4, polyorder=2)
         assert np.abs(smoothed - clean).mean() < np.abs(noisy - clean).mean()
 
     def test_nan_does_not_spread_into_neighbours(self):
         signal = np.concatenate([np.ones(60), [np.nan], np.ones(60) * 2])
-        smoothed = signals.smooth(signal, fps=30.0, window_s=0.4)
+        smoothed = signals.smooth(signal, fps=30.0, window_s=0.4, polyorder=2)
         assert np.isnan(smoothed).sum() == 1

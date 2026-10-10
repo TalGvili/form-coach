@@ -32,6 +32,7 @@ class RepConfig:
     max_tilt_deg: float
     max_gap_frames: int
     smoothing_window_s: float
+    smoothing_polyorder: int
     min_prominence_fraction: float
     min_rep_spacing_s: float
     min_range_deg: float
@@ -66,6 +67,12 @@ class ClipSignals:
     hip_seen: np.ndarray
 
 
+# A clip's range of movement, ignoring its most extreme 5% at each end. Not a tuning knob: it
+# defines what two config thresholds are fractions of (min_prominence_fraction) or compared with
+# (min_range_deg), so changing it would silently change what both mean.
+SPREAD_PERCENTILES = (5, 95)
+
+
 def find_rep_bottoms(
     depth: np.ndarray,
     fps: float,
@@ -86,7 +93,8 @@ def find_rep_bottoms(
     if np.isnan(depth).all():
         return np.array([], dtype=int)
     filled = np.where(np.isnan(depth), np.nanmax(depth), depth)
-    spread = np.percentile(filled, 95) - np.percentile(filled, 5)
+    low, high = np.percentile(filled, SPREAD_PERCENTILES)
+    spread = high - low
     if spread < min_range_deg:
         return np.array([], dtype=int)
     bottoms, _ = find_peaks(
@@ -172,7 +180,9 @@ def clip_signals(
         return signals.interpolate_gaps(inside, cfg.max_gap_frames)
 
     def prepare(series: np.ndarray) -> np.ndarray:
-        return signals.smooth(fill(series), info.fps, cfg.smoothing_window_s)
+        return signals.smooth(
+            fill(series), info.fps, cfg.smoothing_window_s, cfg.smoothing_polyorder
+        )
 
     upper_arm = signals.upper_arm_angle_series(landmarks, side)
     return ClipSignals(

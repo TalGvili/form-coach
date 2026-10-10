@@ -28,6 +28,7 @@ CFG = RepConfig(
     max_tilt_deg=35,
     max_gap_frames=5,
     smoothing_window_s=0.4,
+    smoothing_polyorder=2,
     min_prominence_fraction=0.3,
     min_rep_spacing_s=0.8,
     min_range_deg=10,

@@ -25,8 +25,8 @@ bottom, skeleton in red, and says why.</sub></p>
   fix; the rep table's ▶ buttons jump to any rep.
 - **Says when it can't tell.** A check whose landmark was outside the frame is reported as "not
   checked", never as a pass.
-- **Keeps a history per profile** with progress charts: reps, share of clean reps, depth and a
-  fatigue index. History stores measurements, not verdicts, so old sessions are judged by today's
+- **Keeps each person's history**, with Sign in with Google (or simple local profiles on one
+  computer), and progress charts: reps, share of clean reps, depth and a fatigue index. History stores measurements, not verdicts, so old sessions are judged by today's
   thresholds.
 - **Is evaluated honestly**, on held-out clips chosen before any detection code existed
   ([Results](#results)).
@@ -47,14 +47,42 @@ docker run -p 127.0.0.1:8000:8000 -v form-coach-data:/app/data form-coach
 
 The first start after a build can take a minute or two while Python loads its libraries; the
 server is ready when `docker logs` shows `Application startup complete`. Then open
-`http://localhost:8000`, pick a profile, and upload a side-view video of a few push-ups (under a
+`http://localhost:8000`, pick a profile (or sign in, see below), and upload a side-view video of a few push-ups (under a
 minute). Analysis takes about as long as the video, or more on a busy machine: 37 s to 45 s for
 a 21-second clip in our tests, and nearly four minutes for a 30-second clip in Docker on Windows
-while the computer was busy with other work. The volume keeps your history across restarts. To use it from your phone on the
-same Wi-Fi, run with `-p 8000:8000` and open `http://<your computer's IP>:8000`, on a network you
-trust: profiles keep people's histories apart but aren't accounts.
+while the computer was busy with other work. The volume keeps your history across restarts.
+To use it from your phone on the same Wi-Fi, run with `-p 8000:8000` and open
+`http://<your computer's IP>:8000`, on a network you trust: local profiles keep people's
+histories apart but aren't accounts.
 
 Without Docker, see [Running it without Docker](#running-it-without-docker).
+
+### Sign in with Google (optional)
+
+Out of the box the app runs in local mode, with profiles that are just names: fine for one
+computer. Set `GOOGLE_CLIENT_ID` and people sign in with their Google accounts instead, and each
+sees only their own sessions and videos.
+
+1. **Create a client id** (free; no billing needed): at
+   [console.cloud.google.com](https://console.cloud.google.com/) create a project, then under
+   *Google Auth Platform* set the audience to External (Testing mode, with your account as a test
+   user) and create a *Web application* client with the authorized JavaScript origin
+   `http://localhost:8000`.
+2. **Run with it:** `docker run … -e GOOGLE_CLIENT_ID=<id> -e ALLOWED_EMAILS=<you> form-coach`,
+   or without Docker set the variables before starting uvicorn (PowerShell:
+   `$env:GOOGLE_CLIENT_ID = "<id>"`). The client id isn't a secret: it's in every page.
+3. **Say who may sign in:** `ALLOWED_EMAILS=you@example.com,friend@example.com`, or
+   `ALLOWED_EMAILS=*` for any Google account. Without it the server refuses to start: Google's
+   test-user list doesn't stop other accounts from signing in to this kind of app, so this list,
+   checked by the server, is what does.
+
+How it works: Google's button gives the page an ID token signed by Google; the server checks it
+itself (signature, audience, issuer, expiry) and starts its own login, a random token in an
+HttpOnly, SameSite cookie, stored only as a hash, for 30 days. Every session and video is checked
+against the signed-in user, and someone else's answers "not found". No password is ever stored,
+and the server needs no public address: Google only talks to the browser. Google accepts plain
+HTTP only on `localhost`, so signing in from a phone needs HTTPS, e.g. through
+[Tailscale](https://tailscale.com/kb/1153/enabling-https).
 
 ## How it works
 
@@ -84,8 +112,9 @@ in a fraction of a second, which is what made tuning against labels practical.
 | `pipeline/render.py` | Draws the annotated video and reports where each rep starts in it |
 | `pipeline/progress.py` | Per-session numbers for the progress chart, computed when asked for |
 | `configs/pushup.yaml` | Every threshold, each with the measurement behind it |
-| `app/main.py` | FastAPI: upload, annotated video, profiles, history; every refusal turned into a response in one place |
-| `app/db.py` | SQLite: profiles, sessions and reps, stored as measurements |
+| `app/main.py` | FastAPI: upload, annotated video, sign-in, history; `owner_of()` decides whose data each request touches; every refusal turned into a response in one place |
+| `app/auth.py` | Sign in with Google: checks Google's ID token, makes and hashes login tokens |
+| `app/db.py` | SQLite: users and logins, profiles, sessions and reps (stored as measurements), and who owns each video |
 | `app/static/` | The pages: plain HTML and JavaScript with Chart.js |
 | `eval/` | Evaluation against the hand labels, and the log of every tuning experiment |
 
@@ -320,7 +349,8 @@ annotated video as H.264, the codec browsers play (`winget install Gyan.FFmpeg` 
 `brew install ffmpeg` on macOS, `apt install ffmpeg` on Debian/Ubuntu). The command line doesn't
 need it.
 
-**Web app:** `uvicorn app.main:app`, then open `http://localhost:8000`. Add `--host 0.0.0.0` to
+**Web app:** `uvicorn app.main:app`, then open `http://localhost:8000` (with `GOOGLE_CLIENT_ID`
+set for [Google sign-in](#sign-in-with-google-optional)). Add `--host 0.0.0.0` to
 reach it from a phone on the same Wi-Fi, on a network you trust. Videos must be under a minute
 and 500 MB; a 30-second set takes about a minute to analyse. The uploaded video is deleted once
 it's analysed: only the annotated copy and the pose landmarks are kept, with the history in

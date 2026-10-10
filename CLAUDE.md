@@ -12,7 +12,8 @@ Full plan: @docs/form-coach-project-guide.md
 
 ## Current status
 
-- All eight phases are done. The demo is live at https://talgvili.github.io/form-coach/.
+- All eight phases are done, plus Google sign-in. The demo is live at
+  https://talgvili.github.io/form-coach/.
 - Done: `models.py`; `landmarks.py` with the `.npz` cache (all 20 clips cached);
   `signals.py` and `reps.py` with tests. The hip-deviation sign is verified on real clips
   and by a mirror test. Rep counts match the labels on 12 of 14 training clips (clip08:
@@ -47,6 +48,14 @@ Full plan: @docs/form-coach-project-guide.md
   with `<html data-demo>` (`scripts/build_site.py`), reading `demo/` built locally by
   `scripts/make_demo.py` from clip09; `.github/workflows/pages.yml` deploys it. Ruff enforces
   type hints (`ANN`, tests exempt). The smoothing order is in the YAML.
+- After Phase 8, Sign in with Google (`app/auth.py`), on when `GOOGLE_CLIENT_ID` is set: the page
+  sends Google's ID token to `POST /auth/google` (JSON only), the server verifies it with
+  google-auth and starts its own login (random token in an HttpOnly SameSite cookie, SHA-256 in the
+  `logins` table, 30 days). Users are keyed on Google's `sub`; their owner string is
+  `google:<sub>`. `ALLOWED_EMAILS` (a list, or `*` for anyone) is required with sign-in on: deny
+  by default, and the server won't start without it. Google's Testing-mode test-user list did
+  NOT stop another account in a real test, so the server's list is the control. Without the client id the app
+  is in local mode with profiles, as before. Pages learn the mode from `/config.js`.
 - Metric choices: `shallow` uses `min_upper_arm_angle`, `no_lockout` uses `max_elbow_angle`,
   hip faults use the signed hip deviation. The measurements behind these are in
   `docs/notes.txt` (private, gitignored).
@@ -69,6 +78,9 @@ Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 - ffmpeg is needed by the web app only (the server checks for it at startup); the command line
   and the tests run without it (the one ffmpeg test is skipped).
 - Endpoints that run the analysis are plain `def`, so FastAPI runs them in its thread pool.
+- `owner_of(request, profile)` in `app/main.py` is the one place that decides whose data a request
+  reads or writes; with sign-in on it ignores what the request names. Someone else's session or
+  video is a 404, not a 403.
 - One sqlite3 connection per request, opened with `open_history()` (closed by `closing()`);
   values only through `?` placeholders.
 - The front end is plain HTML/JS: `style.css` and `common.js` are shared; text goes in through

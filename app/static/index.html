@@ -23,6 +23,12 @@
   <p class="card demo-banner" id="demo-banner" hidden></p>
   <p class="lead">Film your push-ups from the side, with your whole body in the frame, and get
     feedback on every rep.</p>
+  <!-- demo only: one button per bundled example, filled from demo/examples.json -->
+  <section class="card" id="examples" hidden>
+    <h2>Pick an example</h2>
+    <div class="picker" id="picker" role="group" aria-label="Example sets"></div>
+    <p class="note" id="example-caption"></p>
+  </section>
 
   <form id="upload" class="drop">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -90,7 +96,7 @@
     profile = me.name;
     showProfileChip(me.name);
   });
-  showDemoBanner("A real analysis of a set from the project's dataset, recorded in advance.");
+  showDemoBanner("Real analyses of three sets from the project's dataset, recorded in advance.");
 
   let charts = [];
 
@@ -128,11 +134,11 @@
   // server judges it again with today's rules, so it can differ from the day it was filmed.
   const opened = new URLSearchParams(location.search).get("session");
   if (DEMO) {
-    // no server to upload to: show the bundled report instead
+    // no server to upload to: show the bundled examples instead
     $("upload").hidden = true;
-    fetch("demo/report.json")
+    fetch("demo/examples.json")
       .then((response) => response.json())
-      .then((data) => showReport(data, { scroll: false }));
+      .then(showExamples);
   } else if (opened) {
     fetch(`/sessions/${encodeURIComponent(opened)}`)
       .then(async (response) => {
@@ -175,6 +181,33 @@
       $("change").hidden = false;
     }
   });
+
+  // The demo's picker. index.html?example=lockout opens that example, the history page's links.
+  let example = null; // the key of the example last asked for
+  function showExamples(examples) {
+    $("picker").replaceChildren(...examples.map((choice) => {
+      const button = el("button", "", choice.title);
+      button.type = "button";
+      button.dataset.key = choice.key;
+      button.addEventListener("click", () => openExample(choice));
+      return button;
+    }));
+    $("examples").hidden = false;
+    const asked = new URLSearchParams(location.search).get("example");
+    openExample(examples.find((choice) => choice.key === asked) ?? examples[0]);
+  }
+
+  async function openExample(choice) {
+    example = choice.key;
+    for (const button of $("picker").children) {
+      button.setAttribute("aria-pressed", button.dataset.key === choice.key);
+    }
+    $("example-caption").textContent = choice.caption;
+    history.replaceState(null, "", `?example=${choice.key}`); // a link to this example
+    const report = await (await fetch(`demo/${choice.key}.json`)).json();
+    // two quick clicks: the slower answer mustn't replace the example picked last
+    if (example === choice.key) showReport(report, { scroll: false });
+  }
 
   function showProgress() {
     // Analysis takes one to two minutes; a running clock shows the page hasn't stalled.

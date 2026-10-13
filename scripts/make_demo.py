@@ -1,17 +1,27 @@
 """Build the static demo's data from the private dataset. Run locally, then commit demo/.
 
-    python scripts/make_demo.py [clip]        # clip09 by default
+    python scripts/make_demo.py
 
-demo/report.json    the report the web app returns for the clip, as the page reads it
-demo/video.mp4      its annotated video, re-encoded smaller for the web (540 px, crf 30)
+demo/examples.json  the examples the page offers: key, title and a one-line caption
+demo/<key>.json     an example's report, as the web app returns it
+demo/<key>.mp4      its annotated video, re-encoded smaller for the web (540 px, crf 30)
 demo/progress.json  the history page's numbers for person A's training sessions: numbers only,
                     no video, with made-up dates three days apart
 
-clip09 is the default because it alternates deep and shallow reps (25-37 deg against 3-12, with
-the limit at 15), every rep agrees with its label, and none carries a borderline note.
+The clips were filmed one fault at a time, so no single clip shows every fault cleanly. Each
+example is a clip where every rep agrees with its label, none carries a borderline note, and
+every shown value is far from its limit:
+  clip09  deep and shallow reps alternate: depth 25-37 deg against 3-12, limit 15
+  clip16  locked and bent arms alternate: 122-151 deg against 164-172, limit 156
+  clip19  person B, filmed facing the other way: hips sag 21-30 deg (limit 13) for over a
+          second, and depth 35-47 deg, on every rep
+Hip pike has no example: clip06 has three relabelled borderline reps, and on clip11 a rep's
+depth reads above its limit but isn't flagged (the pike hides it), which the chart would show
+without explaining. Shown with permission from both people filmed.
 """
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,9 +42,21 @@ DEMO = ROOT / "demo"
 # person B (clip18-20) are left out.
 HISTORY = ["clip01", "clip02", "clip03", "clip04", "clip05", "clip06", "clip07", "clip09",
            "clip11", "clip14", "clip16"]  # fmt: skip
+# key (file names and ?example= on the page), clip, title, caption
+EXAMPLES = [
+    ("depth", "clip09", "Depth", "Every other rep stops short of parallel."),
+    ("lockout", "clip16", "Arm lockout", "Every other rep stops before the arms are straight."),
+    (
+        "hips",
+        "clip19",
+        "Hip sag",
+        "Another person, filmed facing the other way: the hips sag and the reps are shallow "
+        "on every rep.",
+    ),
+]
 
 
-def write_report(clip: str) -> None:
+def write_report(key: str, clip: str) -> None:
     result = analyze(VIDEOS / f"{clip}.mp4", main.CONFIG)
     with tempfile.TemporaryDirectory() as scratch:
         full = Path(scratch) / "annotated.mp4"
@@ -44,14 +66,15 @@ def write_report(clip: str) -> None:
         command = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(full), "-c:v", "libx264"]
         command += ["-preset", "slow", "-crf", "30", "-vf", "scale=-2:540"]
         command += ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]
-        command += ["-an", str(DEMO / "video.mp4")]
+        command += ["-an", str(DEMO / f"{key}.mp4")]
         subprocess.run(command, check=True)
     report = main.report_for(result, "demo", starts, session_id=None)
-    report["video_url"] = "demo/video.mp4"  # relative: the site isn't served from /
-    (DEMO / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    report["video_url"] = f"demo/{key}.mp4"  # relative: the site isn't served from /
+    (DEMO / f"{key}.json").write_text(json.dumps(report), encoding="utf-8")
 
 
-def write_progress(demo_clip: str) -> None:
+def write_progress() -> None:
+    example_of = {clip: key for key, clip, _, _ in EXAMPLES}
     start = datetime(2026, 9, 1, 18, 0, tzinfo=UTC)
     sessions = []
     for day, clip in enumerate(HISTORY):
@@ -59,17 +82,20 @@ def write_progress(demo_clip: str) -> None:
         progress = to_json(session_progress(result, list(main.CHARTED)))
         when = (start + timedelta(days=3 * day)).isoformat(timespec="seconds")
         entry = {"id": day + 1, "created_at": when, **progress}
-        entry["demo_report"] = clip == demo_clip  # the one session whose report is bundled
+        entry["demo_report"] = example_of.get(clip)  # the example to open, if it is one
         sessions.append(entry)
     progress = {"metrics": main.CHARTED, "sessions": sessions}
     (DEMO / "progress.json").write_text(json.dumps(progress), encoding="utf-8")
 
 
 def main_() -> None:
-    clip = sys.argv[1] if len(sys.argv) > 1 else "clip09"
-    DEMO.mkdir(exist_ok=True)
-    write_report(clip)
-    write_progress(clip)
+    shutil.rmtree(DEMO, ignore_errors=True)  # no file of an example that was dropped stays
+    DEMO.mkdir()
+    for key, clip, _, _ in EXAMPLES:
+        write_report(key, clip)
+    examples = [{"key": k, "title": t, "caption": c} for k, _, t, c in EXAMPLES]
+    (DEMO / "examples.json").write_text(json.dumps(examples), encoding="utf-8")
+    write_progress()
     for path in sorted(DEMO.iterdir()):
         print(f"{path.relative_to(ROOT)}: {path.stat().st_size / 1e6:.2f} MB")
 

@@ -47,7 +47,8 @@ Full plan: @docs/form-coach-project-guide.md
   volume); CI builds it, loads MediaPipe's native library and runs `tests/test_end_to_end.py`
   inside it (`FORM_COACH_E2E=required` turns its skip into a failure). The static demo is the app's pages
   with `<html data-demo>` (`scripts/build_site.py`), reading `demo/` built locally by
-  `scripts/make_demo.py` from clip09; `.github/workflows/pages.yml` deploys it. Ruff enforces
+  `scripts/make_demo.py` from three examples the page offers in a picker (clip09 depth, clip16
+  lockout, clip19 hip sag; no clean pike clip exists); `.github/workflows/pages.yml` deploys it. Ruff enforces
   type hints (`ANN`, tests exempt). The smoothing order is in the YAML.
 - After Phase 8, Sign in with Google (`app/auth.py`), on when `GOOGLE_CLIENT_ID` is set: the page
   sends Google's ID token to `POST /auth/google` (JSON only), the server verifies it with

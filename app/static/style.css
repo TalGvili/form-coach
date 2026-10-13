@@ -207,6 +207,18 @@ tbody tr:last-child td { border-bottom: 0; }
 .jump:hover { filter: brightness(0.95); }
 
 .chart { position: relative; height: 260px; }
+
+/* the demo's example picker */
+.picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.picker button {
+  font: inherit; font-weight: 600; cursor: pointer; border-radius: 999px; padding: 8px 16px;
+  border: 1px solid var(--line); background: var(--page); color: var(--ink);
+}
+.picker button:hover { filter: brightness(0.96); }
+.picker button[aria-pressed="true"] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+#examples .note { margin-bottom: 0; }
 .card > .note:last-child { margin-bottom: 0; }
 
 /* profiles: the header chip, avatars and the landing page */

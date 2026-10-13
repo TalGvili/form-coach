@@ -7,8 +7,8 @@ A web app that watches a phone video of your push-ups and gives feedback on ever
 reps, checks four faults (depth, sagging hips, piked hips, arms not locked out), shows you each
 fault on an annotated video, and tracks your progress across sessions.
 
-**[Try the demo →](https://talgvili.github.io/form-coach/)** a real analysis and history,
-nothing to install.
+**[Try the demo →](https://talgvili.github.io/form-coach/)** three real analyses (depth, arm
+lockout, hip sag) and a history, nothing to install.
 
 <p align="center">
   <img src="docs/images/demo.gif" width="480"
@@ -375,4 +375,5 @@ and ffmpeg, locally and inside the Docker image in CI.
 
 The push-up clips are private, so the evaluation can't be re-run from this repo;
 `data/labels.csv` and `data/labeling_sheet.md` are included so the labels and the method can be
-inspected. The demo is built from one clip by `scripts/make_demo.py`.
+inspected. The demo is built from three clips by `scripts/make_demo.py`, shown with permission
+from both people filmed.

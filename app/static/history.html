@@ -156,10 +156,10 @@
     // newest first in the list; the chart reads left to right, oldest first
     const rows = [...progress.sessions].reverse().map((s) => {
       const row = el("tr");
-      // in the demo, only one session's report is bundled, and it opens on the main page
+      // in the demo, only the sessions that are examples have a report, opened by their key
       const open = el("a", "jump", "Open");
-      open.href = DEMO ? "./" : `./?session=${s.id}`;
       open.hidden = DEMO && !s.demo_report;
+      if (!open.hidden) open.href = DEMO ? `./?example=${s.demo_report}` : `./?session=${s.id}`;
       const fix = el("td");
       fix.append(el("i", `badge ${s.to_fix ? "fault" : "ok"}`, String(s.to_fix)));
       row.append(el("td", "", when(s.created_at)), el("td", "", s.reps), fix);

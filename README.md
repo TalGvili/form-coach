@@ -128,6 +128,10 @@ A few decisions worth knowing:
   history consistently instead of mixing old and new verdicts.
 - **The held-out clips were chosen before any detection code**, and evaluated once.
 
+The rule engine is exercise-agnostic; measuring a new exercise isn't.
+[`docs/adding-an-exercise.md`](docs/adding-an-exercise.md) is the plan for a second one: what
+carries over, what has to change once, and the steps for each new exercise.
+
 ## Results
 
 Measured by `python -m eval.evaluate`. Every tuning step, with its numbers, is in

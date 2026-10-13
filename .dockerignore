@@ -10,6 +10,7 @@ models/
 .venv/
 .git/
 docs/notes.txt
+docs/form-coach-project-guide.md
 **/__pycache__/
 .pytest_cache/
 .ruff_cache/

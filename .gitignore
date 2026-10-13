@@ -16,3 +16,6 @@ data/uploads/
 
 # The static demo site, built by scripts/build_site.py.
 site/
+
+# The step-by-step build plan: a working document for me, not for readers of the repo.
+docs/form-coach-project-guide.md

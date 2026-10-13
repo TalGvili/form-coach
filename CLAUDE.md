@@ -1,14 +1,6 @@
 # Form Coach
 
 Web app that analyzes phone video of push-ups and gives per-rep form feedback.
-Full plan: @docs/form-coach-project-guide.md
-
-## About me and how to help
-
-- Third-year CS student; this is my first real project and portfolio piece for internship interviews.
-- I must be able to explain every line in an interview. Default to explaining and reviewing,
-  not writing whole modules for me. When I ask for code, keep it small and explain the why.
-- Point out bugs, bad design and missing tests directly.
 
 ## Current status
 

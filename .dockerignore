@@ -11,6 +11,7 @@ models/
 .git/
 docs/notes.txt
 docs/form-coach-project-guide.md
+CLAUDE.local.md
 **/__pycache__/
 .pytest_cache/
 .ruff_cache/

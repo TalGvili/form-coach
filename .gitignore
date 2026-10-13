@@ -19,3 +19,6 @@ site/
 
 # The step-by-step build plan: a working document for me, not for readers of the repo.
 docs/form-coach-project-guide.md
+
+# Claude's personal instructions for this project, kept off GitHub.
+CLAUDE.local.md

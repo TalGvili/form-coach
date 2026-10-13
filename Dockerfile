@@ -11,9 +11,8 @@
 FROM python:3.12-slim
 
 # ffmpeg encodes the annotated video for browsers. OpenCV loads libGL and GLib when imported;
-# MediaPipe's native library loads EGL and GLES when the pose model is created. Only an upload
-# does that (the tests never create the model), so a real upload in the container is the test
-# for these two.
+# MediaPipe's native library loads EGL and GLES when the pose model is created. Only a real
+# upload does that, so CI runs tests/test_end_to_end.py inside this image to check these two.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ffmpeg libgl1 libglib2.0-0 libegl1 libgles2 \

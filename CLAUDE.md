@@ -44,7 +44,8 @@ Full plan: @docs/form-coach-project-guide.md
   middleware, original deleted after analysis, nothing kept on refusal.
 - Phase 8: `Dockerfile` (python:3.12-slim, ffmpeg, libgl1/libglib2.0-0 for OpenCV,
   libegl1/libgles2 for MediaPipe, the model downloaded with its SHA-256, non-root user, data/ as a
-  volume); CI builds it and loads MediaPipe's native library. The static demo is the app's pages
+  volume); CI builds it, loads MediaPipe's native library and runs `tests/test_end_to_end.py`
+  inside it (`FORM_COACH_E2E=required` turns its skip into a failure). The static demo is the app's pages
   with `<html data-demo>` (`scripts/build_site.py`), reading `demo/` built locally by
   `scripts/make_demo.py` from clip09; `.github/workflows/pages.yml` deploys it. Ruff enforces
   type hints (`ANN`, tests exempt). The smoothing order is in the YAML.
@@ -76,7 +77,7 @@ Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 - A video the pipeline refuses raises a subclass of `pipeline.errors.AnalysisError` with a
   message written for the user; callers catch the base class.
 - ffmpeg is needed by the web app only (the server checks for it at startup); the command line
-  and the tests run without it (the one ffmpeg test is skipped).
+  and the tests run without it (the tests that need it are skipped).
 - Endpoints that run the analysis are plain `def`, so FastAPI runs them in its thread pool.
 - `owner_of(request, profile)` in `app/main.py` is the one place that decides whose data a request
   reads or writes; with sign-in on it ignores what the request names. Someone else's session or
@@ -86,5 +87,7 @@ Phase 1 is done: 20 clips, 158 labeled reps in `data/labels.csv`, generated from
 - The front end is plain HTML/JS: `style.css` and `common.js` are shared; text goes in through
   `textContent`, never `innerHTML`.
 - All thresholds live in `configs/*.yaml`, no magic numbers in code.
-- Tests use synthetic signals, never the private videos in `data/`.
+- Tests use synthetic signals, never the private videos in `data/`. The one exception is
+  `tests/fixtures/three_pushups.mp4` (clip09's first 12.6 s, 360p, public like the demo), used
+  only by the end-to-end test, which checks only outcomes far from every threshold.
 - Run `ruff check .` and `pytest` before every commit.

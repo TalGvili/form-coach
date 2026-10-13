@@ -202,7 +202,8 @@ The full log, with numbers for every change, is in [`eval/EXPERIMENTS.md`](eval/
 - **Engineering surprises.** Pauses made the annotated video longer than the original, so "jump
   to rep 5" needed times counted from the frames actually written. Rendering went from 35 s to
   13.5 s by piping frames straight into ffmpeg instead of encoding twice. In Docker, the first
-  real upload failed on a missing graphics library that no test exercised; CI now loads it.
+  real upload failed on a missing graphics library that no test exercised; CI now runs a real
+  video through the image.
 
 ## Dataset and labeling
 
@@ -368,7 +369,9 @@ python analyze.py path/to/video.mp4 --render
 ```
 
 **Tests and checks:** `pytest`, `ruff check .`, `ruff format --check .`; CI runs them and builds
-the Docker image on every push. Tests use synthetic signals, never the private videos.
+the Docker image on every push. Tests use synthetic signals, never the private videos; one
+end-to-end test runs a 12-second public clip (`tests/fixtures/`) through the real pose model
+and ffmpeg, locally and inside the Docker image in CI.
 
 The push-up clips are private, so the evaluation can't be re-run from this repo;
 `data/labels.csv` and `data/labeling_sheet.md` are included so the labels and the method can be

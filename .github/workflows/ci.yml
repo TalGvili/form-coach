@@ -49,6 +49,14 @@ jobs:
           docker run --rm form-coach python -c
           "from mediapipe.tasks.python.core import mediapipe_c_bindings as m; m.load_raw_library()"
 
+      # The only test that runs the pose model on a real video; the check job has no model and
+      # skips it. Here a missing model or ffmpeg must fail it, not skip it (FORM_COACH_E2E).
+      # -p no:cacheprovider: the container's user can't write next to the code.
+      - name: A real video, end to end, inside the image
+        run: >
+          docker run --rm -e FORM_COACH_E2E=required form-coach
+          python -m pytest -p no:cacheprovider tests/test_end_to_end.py
+
       - name: The server starts and answers
         run: |
           docker run -d --name form-coach -p 8000:8000 form-coach
